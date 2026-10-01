@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budgeting App</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/cards.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="app-title">Budgeting</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" data-view="dashboard" class="nav-link active">
+                    <span class="nav-text">Dashboard</span>
+                </a>
+                <a href="#" data-view="cards" class="nav-link">
+                    <span class="nav-text">Cards</span>
+                </a>
+                <a href="#" data-view="transactions" class="nav-link">
+                    <span class="nav-text">Transactions</span>
+                </a>
+                <a href="#" data-view="analytics" class="nav-link">
+                    <span class="nav-text">Analytics</span>
+                </a>
+                <a href="#" data-view="categories" class="nav-link">
+                    <span class="nav-text">Categories</span>
+                </a>
+                <a href="#" data-view="settings" class="nav-link">
+                    <span class="nav-text">Settings</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- View: Dashboard -->
+            <div id="view-dashboard" class="view active">
+                <div class="view-header">
+                    <h2>Dashboard</h2>
+                    <button class="btn btn-primary" onclick="triggerSync()">
+                        <span>Sync Gmail</span>
+                    </button>
+                </div>
+
+                <div class="dashboard-section">
+                    <h3>All Time <span class="section-caption" id="all-time-caption"></span></h3>
+                    <div class="summary-cards">
+                        <div class="summary-card">
+                            <div class="summary-label">Total Spent (CRC)</div>
+                            <div class="summary-value" id="summary-spent-crc">₡0.00</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Total Spent (USD)</div>
+                            <div class="summary-value" id="summary-spent-usd">$0.00</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Transactions</div>
+                            <div class="summary-value" id="summary-transactions">0</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Active Cards</div>
+                            <div class="summary-value" id="summary-cards">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-section">
+                    <h3>This Month <span class="section-caption" id="this-month-label"></span></h3>
+                    <div class="summary-cards">
+                        <div class="summary-card">
+                            <div class="summary-label">Spent (CRC)</div>
+                            <div class="summary-value" id="this-month-crc">₡0.00</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Spent (USD)</div>
+                            <div class="summary-value" id="this-month-usd">$0.00</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Needs a Category</div>
+                            <div class="summary-value" id="uncategorized-count">0</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Tracking Since</div>
+                            <div class="summary-value" id="oldest-date">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-section">
+                    <h3>Recent Transactions</h3>
+                    <div id="recent-transactions" class="transactions-list">
+                        <p class="loading">Loading...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Cards -->
+            <div id="view-cards" class="view">
+                <div class="view-header">
+                    <h2>Your Cards</h2>
+                    <button class="btn btn-primary" onclick="showAddCardModal()">
+                        <span>+ Add Card</span>
+                    </button>
+                </div>
+
+                <div id="cards-grid" class="cards-grid">
+                    <p class="loading">Loading cards...</p>
+                </div>
+            </div>
+
+            <!-- View: Transactions -->
+            <div id="view-transactions" class="view">
+                <div class="view-header">
+                    <h2>Transactions</h2>
+                    <div class="view-header-actions">
+                        <button class="btn btn-secondary" onclick="showInstallmentPlanModal()">
+                            <span>+ Tasa Cero</span>
+                        </button>
+                        <button class="btn btn-secondary" onclick="showFilters()">
+                            <span>Filters</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="transaction-filters" class="filters-panel" style="display: none;">
+                    <div class="filter-group">
+                        <label>Date Range</label>
+                        <input type="date" id="filter-start-date" class="input">
+                        <input type="date" id="filter-end-date" class="input">
+                    </div>
+                    <div class="filter-group">
+                        <label>Search</label>
+                        <input type="text" id="filter-search" class="input" placeholder="Search merchant...">
+                    </div>
+                    <div class="filter-group">
+                        <label>Currency</label>
+                        <select id="filter-currency" class="input">
+                            <option value="">All</option>
+                            <option value="CRC">CRC</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Category</label>
+                        <select id="filter-category" class="input">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Card</label>
+                        <select id="filter-card" class="input">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-primary" onclick="applyFilters()">Apply</button>
+                        <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
+                    </div>
+                </div>
+
+                <div id="transactions-table" class="transactions-table">
+                    <p class="loading">Loading transactions...</p>
+                </div>
+
+                <div id="transaction-totals" class="transaction-totals"></div>
+
+                <div id="transaction-pagination" class="pagination"></div>
+            </div>
+
+            <!-- View: Analytics -->
+            <div id="view-analytics" class="view">
+                <div class="view-header">
+                    <h2>Analytics</h2>
+                </div>
+
+                <div class="filters-panel">
+                    <div class="filter-group">
+                        <label>Quick Range</label>
+                        <div class="preset-buttons">
+                            <button type="button" class="btn btn-secondary" onclick="setAnalyticsPreset('month')">This Month</button>
+                            <button type="button" class="btn btn-secondary" onclick="setAnalyticsPreset('30d')">Last 30 Days</button>
+                            <button type="button" class="btn btn-secondary" onclick="setAnalyticsPreset('3m')">Last 3 Months</button>
+                            <button type="button" class="btn btn-secondary" onclick="setAnalyticsPreset('all')">All Time</button>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Start Date</label>
+                        <input type="date" id="analytics-start-date" class="input">
+                    </div>
+                    <div class="filter-group">
+                        <label>End Date</label>
+                        <input type="date" id="analytics-end-date" class="input">
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-primary" onclick="applyAnalyticsFilters()">Apply</button>
+                        <button class="btn btn-secondary" onclick="clearAnalyticsFilters()">Reset</button>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>Spending by Day</h3>
+                        <div id="chart-daily-spending"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Monthly Trends (last 6 months)</h3>
+                        <div id="chart-monthly-trends"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Spending by Category (CRC)</h3>
+                        <div id="chart-category-pie-crc"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Spending by Category (USD)</h3>
+                        <div id="chart-category-pie-usd"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Top Merchants (CRC)</h3>
+                        <div id="chart-top-merchants-crc"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Top Merchants (USD)</h3>
+                        <div id="chart-top-merchants-usd"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Spending by Card</h3>
+                        <div id="chart-card-utilization"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Categories -->
+            <div id="view-categories" class="view">
+                <div class="view-header">
+                    <h2>Categories</h2>
+                    <button class="btn btn-primary" onclick="showAddCategoryModal()">
+                        <span>+ Add Category</span>
+                    </button>
+                </div>
+
+                <div id="categories-list" class="categories-list">
+                    <p class="loading">Loading categories...</p>
+                </div>
+            </div>
+
+            <!-- View: Settings -->
+            <div id="view-settings" class="view">
+                <div class="view-header">
+                    <h2>Settings</h2>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Email Sources</h3>
+                    <div id="email-sources-list">
+                        <p class="loading">Loading...</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="showAddEmailSourceModal()" style="margin-top: 16px;">
+                        + Add Email Source
+                    </button>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Sync Status</h3>
+                    <div id="sync-status">
+                        <p id="last-sync-time">Last sync: Never</p>
+                        <button class="btn btn-primary" onclick="triggerSync()">Sync Now</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay" style="display: none;" onclick="closeModal()"></div>
+
+    <!-- Add/Edit Card Modal -->
+    <div id="modal-card" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="card-modal-title">Add Card</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="card-form" onsubmit="saveCard(event)">
+                    <input type="hidden" id="card-id">
+                    <div class="form-group">
+                        <label>Card Name</label>
+                        <input type="text" id="card-name" class="input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Last 4 Digits</label>
+                        <input type="text" id="card-last-four" class="input" maxlength="4" pattern="[0-9]{4}">
+                    </div>
+                    <div class="form-group">
+                        <label>Bank</label>
+                        <input type="text" id="card-bank" class="input">
+                    </div>
+                    <div class="form-group">
+                        <label>Card Type</label>
+                        <select id="card-type" class="input">
+                            <option value="credit">Credit</option>
+                            <option value="debit">Debit</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Card Color</label>
+                        <input type="color" id="card-color" class="input" value="#4F46E5">
+                    </div>
+                    <div class="form-group">
+                        <label>Default Category (Optional)</label>
+                        <select id="card-default-category" class="input">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="card-supports-crc" checked>
+                            Supports CRC
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="card-supports-usd" checked>
+                            Supports USD
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Statement Cut Date (day of month, credit cards)</label>
+                        <input type="number" id="card-cutoff-day" class="input" min="1" max="28" placeholder="e.g. 18">
+                        <p class="field-hint">Purchases are grouped into the statement that closes on this day each month; the balance is due the 1st of the following month. Leave blank for debit/cash.</p>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Billing Cycles Modal (read-only) -->
+    <div id="modal-billing-cycles" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="billing-cycles-title">Billing Cycles</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="billing-cycles-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tasa Cero (Installment Plan) Modal -->
+    <div id="modal-installment-plan" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Tasa Cero (Installment Plan)</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="installment-plan-form" onsubmit="saveInstallmentPlan(event)">
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="plan-description" class="input" placeholder="e.g. Laptop Dell" required>
+                    </div>
+                    <div class="form-group">
+                        <label id="plan-total-amount-label">Total Amount</label>
+                        <input type="number" id="plan-total-amount" class="input" step="0.01" min="0.01" required>
+                        <p class="field-hint" id="plan-total-amount-hint">For a plan already in progress elsewhere, enter the <strong>remaining balance</strong>, not the original price.</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Currency</label>
+                        <select id="plan-currency" class="input">
+                            <option value="CRC">CRC</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Total Installments (the "Y" in your bank's "X of Y cuotas")</label>
+                        <input type="number" id="plan-num-installments" class="input" min="1" max="60" value="12" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Next Installment Number</label>
+                        <input type="number" id="plan-starting-installment" class="input" min="1" value="1" required>
+                        <p class="field-hint">1 for a brand-new plan. For one already partway through (e.g. "17 of 18 cuotas" with 1 left), enter 18 - only the remaining charges get created, numbered correctly from there.</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Charge Day (day of month)</label>
+                        <input type="number" id="plan-charge-day" class="input" min="1" max="28" value="18" required>
+                    </div>
+                    <div class="form-group">
+                        <label id="plan-first-month-label">First Charge Month</label>
+                        <input type="month" id="plan-first-month" class="input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Card</label>
+                        <select id="plan-card" class="input" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Category (Optional)</label>
+                        <select id="plan-category" class="input">
+                            <option value="">Uncategorized</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Create Plan</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    </div>
+                </form>
+
+                <div class="existing-plans">
+                    <h4>Existing Plans</h4>
+                    <div id="installment-plans-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Category Modal -->
+    <div id="modal-category" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="category-modal-title">Add Category</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="category-form" onsubmit="saveCategory(event)">
+                    <input type="hidden" id="category-id">
+                    <div class="form-group">
+                        <label>Category Name</label>
+                        <input type="text" id="category-name" class="input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="category-type" class="input">
+                            <option value="expense">Expense</option>
+                            <option value="income">Income</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Icon (Emoji)</label>
+                        <input type="text" id="category-icon" class="input" maxlength="2" value="📁">
+                    </div>
+                    <div class="form-group">
+                        <label>Color</label>
+                        <input type="color" id="category-color" class="input" value="#6B7280">
+                    </div>
+
+                    <div id="category-rules-section" class="form-group" hidden>
+                        <label>Auto-categorization Rules</label>
+                        <div id="category-rules-list" class="rules-list"></div>
+                        <div class="rule-add-row">
+                            <select id="new-rule-match-type" class="input">
+                                <option value="starts_with">Starts with</option>
+                                <option value="contains">Contains</option>
+                                <option value="regex" disabled>Regex (coming soon)</option>
+                            </select>
+                            <input type="text" id="new-rule-value" class="input" placeholder="Merchant text, e.g. UBER">
+                            <button type="button" class="btn btn-secondary" onclick="addCategorizationRule()">+ Add Rule</button>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Email Source Modal -->
+    <div id="modal-email-source" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Email Source</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="email-source-form" onsubmit="saveEmailSource(event)">
+                    <div class="form-group">
+                        <label>Source Name</label>
+                        <input type="text" id="source-name" class="input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" id="source-email" class="input" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

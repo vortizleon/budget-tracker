@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Wrapper so `finance-app <command>` works from anywhere once symlinked onto PATH.
+set -euo pipefail
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  TARGET="$(readlink "$SOURCE")"
+  if [[ "$TARGET" = /* ]]; then
+    SOURCE="$TARGET"
+  else
+    SOURCE="$(dirname "$SOURCE")/$TARGET"
+  fi
+done
+DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+exec "$DIR/venv/bin/python" "$DIR/backend/manage.py" "$@"
