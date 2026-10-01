@@ -21,7 +21,7 @@
    aparece. Esto solo hay que hacerlo la primera vez.
 4. Se abre una ventana de Terminal y el instalador empieza a trabajar solo:
    instala lo que haga falta (puede pedirte tu contraseña de Mac — es
-   normal, no se ve mientras escribes) y prepara la app.
+   normal, no se ve mientras escribes, todo es LOCAL en tu computadore) y prepara la app.
 5. En algún momento el instalador se va a detener y decirte que falta el
    archivo `credentials.json`. Es normal — eso es lo que haces en el
    siguiente paso. Deja esa ventana abierta o ciérrala, no pasa nada; cuando
