@@ -65,8 +65,8 @@ function toggleTheme() {
 }
 
 function updateThemeToggleIcon(isDark) {
-    document.getElementById('theme-icon-moon').hidden = isDark;
-    document.getElementById('theme-icon-sun').hidden = !isDark;
+    document.getElementById('theme-icon-moon').classList.toggle('theme-icon-off', isDark);
+    document.getElementById('theme-icon-sun').classList.toggle('theme-icon-off', !isDark);
 
     const btn = document.getElementById('theme-toggle');
     btn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';

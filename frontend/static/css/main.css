@@ -138,6 +138,12 @@ body {
     color: var(--text-primary);
 }
 
+/* Explicit class rather than the [hidden] attribute - some WebKit
+   versions don't reliably apply [hidden]'s display:none to inline SVG. */
+.theme-icon-off {
+    display: none !important;
+}
+
 /* Privacy mode: blur money figures without touching layout/markup */
 body.privacy-mode .money-value {
     filter: blur(6px);

@@ -38,8 +38,12 @@ class EmailParser:
             ],
             'date': [
                 # BAC format: "Nov 28, 2025, 17:36"
-                r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4})',
-                r'((?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)[a-z]*\s+\d{1,2},\s+\d{4})',
+                # Some BAC auto-charge templates (e.g. "SEGURO ..." /
+                # CARGO AUTOMATICO) omit the space after the day's comma -
+                # "Sep 18,2026" - so that comma's trailing whitespace is
+                # optional, not required.
+                r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s*\d{4})',
+                r'((?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)[a-z]*\s+\d{1,2},\s*\d{4})',
                 # Promerica format (2026): "26 sep 2026 / 16:30"
                 r'(\d{1,2}\s+(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)[a-z]*\s+\d{4})',
                 # YYYY-MM-DD must be tried before DD-MM-YY below, since e.g.
@@ -186,7 +190,7 @@ class EmailParser:
         if match:
             day, month_name, year = match.groups()
         else:
-            match = re.match(r'([a-zA-Z]+)\s+(\d{1,2}),\s+(\d{4})$', date_str)
+            match = re.match(r'([a-zA-Z]+)\s+(\d{1,2}),\s*(\d{4})$', date_str)
             if not match:
                 return None
             month_name, day, year = match.groups()
