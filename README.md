@@ -21,6 +21,7 @@ Once set up (see below), everything day-to-day goes through the `finance-app` co
 | Command | What it does |
 |---|---|
 | `finance-app` (or `open`) | Starts the server if it's not already running, and opens the dashboard in your browser |
+| `finance-app demo` | Same, but in a Chrome window with no address bar/tabs - for presenting or screen-sharing |
 | `finance-app sync [--days N]` | Pulls new transactions from Gmail. Default: last 30 days |
 | `finance-app sync --start-date YYYY-MM-DD --end-date YYYY-MM-DD` | Backfills a specific date range instead (e.g. to fill a gap) - see example below |
 | `finance-app recategorize [--all]` | Re-applies your categorization rules to existing transactions. Only touches `Uncategorized` ones by default; `--all` re-checks everything |

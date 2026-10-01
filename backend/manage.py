@@ -2,6 +2,7 @@
 
 Subcommands:
   open (default)  Start the web server (if not already running) and open it in a browser.
+  demo            Same, but in a chrome-less window (no URL bar) - for presenting/screen-sharing.
   restart         Restart the server - use this after backend (.py) code changes.
   sync            Sync transactions from all active Gmail email sources.
   recategorize    Re-apply categorization rules to existing transactions.
@@ -83,6 +84,30 @@ def cmd_open(args):
     url = f"http://localhost:{PORT}"
     print(f"Opening {url}")
     webbrowser.open(url)
+
+
+def cmd_demo(args):
+    """Open in Chrome's --app mode: no address bar, tabs, or toolbar - just
+    the app in its own window, titled by the page's <title> instead of
+    showing the URL. Good for screen-sharing/presenting."""
+    if not port_in_use():
+        if not start_server():
+            return
+    else:
+        print("Server already running.")
+
+    url = f"http://localhost:{PORT}"
+    chrome_path = "/Applications/Google Chrome.app"
+    if not Path(chrome_path).exists():
+        print(f"✗ {chrome_path} not found - falling back to a normal browser tab.")
+        webbrowser.open(url)
+        return
+
+    print(f"Opening {url} in app mode (no address bar)...")
+    subprocess.Popen(
+        ["open", "-na", "Google Chrome", "--args", f"--app={url}"],
+        start_new_session=True,
+    )
 
 
 def cmd_restart(args):
@@ -266,6 +291,9 @@ def main():
 
     open_parser = subparsers.add_parser("open", help="Start the server (if needed) and open it in a browser")
     open_parser.set_defaults(func=cmd_open)
+
+    demo_parser = subparsers.add_parser("demo", help="Open in a chrome-less window (no URL bar) for presenting/screen-sharing")
+    demo_parser.set_defaults(func=cmd_demo)
 
     restart_parser = subparsers.add_parser("restart", help="Restart the server to pick up backend code changes")
     restart_parser.set_defaults(func=cmd_restart)
