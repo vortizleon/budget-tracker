@@ -4,15 +4,6 @@ A simple app that automatically imports bank receipts from Gmail and helps manag
 
 **macOS only.** There's no Windows support and none is planned — if you're on Windows you're on your own (WSL might work, untested).
 
-## Sharing this with friends
-
-If you're giving this to someone to run on their own Mac (not developing on it), they don't need any of the developer instructions below. Point them at:
-
-1. **[GUIA_DE_USO.md](GUIA_DE_USO.md)** (Spanish) — a non-technical, start-to-finish guide: downloading the project, running the installer, setting up their own Google Cloud project (the one step they have to do themselves — see note below), and day-to-day use.
-2. **`Instalar.command`** — double-click it in Finder. It installs Homebrew/Python if missing, sets up the app, and walks through first-time configuration. Safe to re-run.
-
-**The one thing you can't do for them:** Gmail access requires *each person's own* Google Cloud project and OAuth credentials (`credentials.json`) — this is a Google restriction, not something this app can centralize or share across users. `GUIA_DE_USO.md` walks them through creating it themselves; it only takes a few minutes but does require their own Google account.
-
 ## Stack
 
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
