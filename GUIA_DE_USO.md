@@ -16,7 +16,7 @@
 1. Abre esa carpeta y busca el archivo **`Instalar.command`**.
 2. Haz doble clic en él.
 3. Si tu Mac muestra un aviso de que no puede abrirlo porque es de un
-   "desarrollador no identificado": haz **clic derecho** sobre
+   "desarrollador no identificado" (es porque no soy ningun big corp): haz **clic derecho** sobre
    `Instalar.command` → **Abrir** → y confirma **Abrir** en la ventana que
    aparece. Esto solo hay que hacerlo la primera vez.
 4. Se abre una ventana de Terminal y el instalador empieza a trabajar solo:
