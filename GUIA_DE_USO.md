@@ -2,8 +2,7 @@
 
 ## 1. Descargar la app
 
-1. Abre esta página en tu navegador: https://github.com/vortizleon/budget-tracker
-2. Haz clic en el botón verde **"Code"** y luego en **"Download ZIP"**.
+1. Haz click aca para descargar el ZIP: https://github.com/vortizleon/budget-tracker/archive/refs/heads/main.zip
 3. Busca el archivo `budget-tracker-main.zip` en tu carpeta de **Descargas**
    y haz doble clic para descomprimirlo.
 4. Mueve la carpeta `budget-tracker-main` a donde prefieras tenerla de forma
