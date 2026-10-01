@@ -1,4 +1,5 @@
 """Initialize database and create sample data."""
+import argparse
 import sys
 from pathlib import Path
 
@@ -9,37 +10,69 @@ from backend.models import Card, Account, Category, EmailSource, Subscription
 
 
 def create_default_categories(db):
-    """Create default expense categories."""
+    """Create default expense categories, with the colors/icons already tuned
+    through real use - new users get a dashboard that looks finished instead
+    of a wall of gray folder icons."""
     default_categories = [
-        ("Uncategorized", "expense"),
-        ("Supermarket", "expense"),
-        ("Restaurants", "expense"),
-        ("Takeout", "expense"),
-        ("Transportation", "expense"),
-        ("Entertainment", "expense"),
-        ("Shopping", "expense"),
-        ("Health", "expense"),
-        ("Utilities", "expense"),
-        ("Home Services", "expense"),
-        ("Rent/Mortgage", "expense"),
-        ("Subscriptions", "expense"),
-        ("Seguros Tarjetas", "expense"),
-        ("Transactions", "expense"),
-        ("Salary", "income"),
-        ("Other Income", "income"),
+        # (name, type, color, icon)
+        ("Uncategorized", "expense", "#6B7280", "📁"),
+        ("Supermarket", "expense", "#56B35C", "🍅"),
+        ("Restaurants", "expense", "#E356E6", "🍛"),
+        ("Takeout", "expense", "#8F0015", "🍟"),
+        ("Transportation", "expense", "#E10E0E", "🚗"),
+        ("Entertainment", "expense", "#FFDD00", "🥂"),
+        ("Shopping", "expense", "#80FF00", "👕"),
+        ("Health", "expense", "#347A1A", "🩻"),
+        ("Utilities", "expense", "#6A92E2", "🚰"),
+        ("Home Services", "expense", "#6B7280", "📁"),
+        ("Rent/Mortgage", "expense", "#FFA200", "🏡"),
+        ("Subscriptions", "expense", "#141AC2", "📺"),
+        ("Seguros Tarjetas", "expense", "#6B7280", "💳"),
+        ("Transactions", "expense", "#FFD666", "💸"),
+        ("Salary", "income", "#7696D6", "💰"),
+        ("Other Income", "income", "#6B7280", "📁"),
     ]
 
     print("\n📁 Creating default categories...")
-    for name, cat_type in default_categories:
+    for name, cat_type, color, icon in default_categories:
         existing = db.query(Category).filter(Category.name == name).first()
         if not existing:
-            category = Category(name=name, category_type=cat_type)
+            category = Category(name=name, category_type=cat_type, color=color, icon=icon)
             db.add(category)
-            print(f"  ✓ Created category: {name}")
+            print(f"  ✓ Created category: {icon} {name}")
         else:
             print(f"  ⊘ Category already exists: {name}")
 
     db.commit()
+
+
+def create_default_email_sources(db):
+    """Seed the bank notification senders this app already knows how to parse.
+
+    These are each bank's own outgoing address - the same for every one of
+    their customers, not tied to any particular person's inbox - so seeding
+    them means a new user doesn't have to find out *before* their first sync
+    that they needed to add these manually. Users who bank elsewhere can
+    still add more via option 4 in the menu.
+    """
+    default_sources = [
+        ("BAC - transacciones", "NotificacionBAC@baccredomatic.cr"),
+        ("BAC - alertas (transferencias/retiros/pagos)", "alerta@baccredomatic.com"),
+        ("Promerica", "info@promerica.fi.cr"),
+    ]
+
+    print("\n📧 Adding default email sources (BAC, Promerica)...")
+    for name, email in default_sources:
+        existing = db.query(EmailSource).filter(EmailSource.email_address == email).first()
+        if not existing:
+            source = EmailSource(name=name, email_address=email)
+            db.add(source)
+            print(f"  ✓ Added email source: {name} ({email})")
+        else:
+            print(f"  ⊘ Email source already exists: {email}")
+
+    db.commit()
+    print("  Bank elsewhere? Add more email sources from the web UI (Settings) or option 4 in this menu.")
 
 
 def add_sample_card(db):
@@ -321,7 +354,7 @@ def interactive_menu(db):
         print("\n" + "="*60)
         print("Database Setup & Management")
         print("="*60)
-        print("1. Create default categories")
+        print("1. Create default categories + add BAC/Promerica email sources")
         print("2. Add a card")
         print("3. Add an account")
         print("4. Add an email source")
@@ -337,6 +370,7 @@ def interactive_menu(db):
 
         if choice == '1':
             create_default_categories(db)
+            create_default_email_sources(db)
         elif choice == '2':
             add_sample_card(db)
         elif choice == '3':
@@ -361,7 +395,21 @@ def interactive_menu(db):
 
 
 def main():
-    """Main entry point."""
+    """Main entry point.
+
+    Plain `init_db.py` opens the interactive menu (for CLI-comfortable
+    users). `init_db.py --seed-only` just seeds categories + the known bank
+    email sources and exits - no prompts - so a non-technical install can
+    skip straight to the web UI (Cards tab, Settings tab) for everything
+    else. Both paths are equivalent; --seed-only is just non-interactive.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--seed-only", action="store_true",
+        help="Create default categories + email sources and exit, skipping the interactive menu."
+    )
+    args = parser.parse_args()
+
     print("\n🏦 Budgeting App - Database Initialization\n")
 
     # Initialize database
@@ -372,7 +420,12 @@ def main():
     db = SessionLocal()
 
     try:
-        interactive_menu(db)
+        if args.seed_only:
+            create_default_categories(db)
+            create_default_email_sources(db)
+            print("\n✓ Ready. Add cards and (if needed) more email sources from the web UI, then sync.")
+        else:
+            interactive_menu(db)
     except KeyboardInterrupt:
         print("\n\n✗ Cancelled by user")
     finally:

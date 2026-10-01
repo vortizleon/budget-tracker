@@ -2,6 +2,17 @@
 
 A simple app that automatically imports bank receipts from Gmail and helps manage personal finances. Built for Costa Rican banks (BAC, Promerica) but the email parser and categorization rules are fully customizable for others.
 
+**macOS only.** There's no Windows support and none is planned — if you're on Windows you're on your own (WSL might work, untested).
+
+## Sharing this with friends
+
+If you're giving this to someone to run on their own Mac (not developing on it), they don't need any of the developer instructions below. Point them at:
+
+1. **[GUIA_DE_USO.md](GUIA_DE_USO.md)** (Spanish) — a non-technical, start-to-finish guide: downloading the project, running the installer, setting up their own Google Cloud project (the one step they have to do themselves — see note below), and day-to-day use.
+2. **`Instalar.command`** — double-click it in Finder. It installs Homebrew/Python if missing, sets up the app, and walks through first-time configuration. Safe to re-run.
+
+**The one thing you can't do for them:** Gmail access requires *each person's own* Google Cloud project and OAuth credentials (`credentials.json`) — this is a Google restriction, not something this app can centralize or share across users. `GUIA_DE_USO.md` walks them through creating it themselves; it only takes a few minutes but does require their own Google account.
+
 ## Stack
 
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
@@ -60,153 +71,53 @@ Frontend (`.html`/`.css`/`.js`) edits don't need `restart` - they're served fres
 
 A reasonable routine: `finance-app sync` weekly, `finance-app report` on the 1st-3rd of each month.
 
-## Milestone 1: Gmail Ingestion + Database ✅
+## Developer / manual setup
 
-### What We Built
-
-- ✅ Gmail API integration with OAuth authentication
-- ✅ Email fetching and parsing
-- ✅ SQLite database with multi-currency card support
-- ✅ Configurable email sources (multiple banks)
-- ✅ CLI sync tool
-- ✅ Database management tools
-
----
-
-## Setup Instructions
-
-### 1. Install Dependencies
+For working on the code itself. (If you just want to run the app, use `Instalar.command` instead — see above.)
 
 ```bash
-# Create virtual environment
-python3 -m venv venv
-
-# Activate it
-source venv/bin/activate  # On Mac/Linux
-# or
-venv\Scripts\activate  # On Windows
+# Create virtual environment (Python 3.13)
+python3.13 -m venv venv
 
 # Install packages
-pip install -r requirements.txt
+venv/bin/pip install -r requirements.txt
 ```
 
-### 2. Gmail API Setup
+**Gmail API setup:** each person who runs this app needs their own Google Cloud project with the Gmail API enabled and a `credentials.json` downloaded to the project root — see the "Configura tu proyecto de Google" section in [GUIA_DE_USO.md](GUIA_DE_USO.md) for the exact steps (it's in Spanish, but the Google Cloud Console click-path is the same regardless).
 
-You should have already:
-- Created a Google Cloud project
-- Enabled Gmail API
-- Downloaded `credentials.json` to project root
-
-If not, see the Gmail API setup section in the mentor instructions.
-
-### 3. Initialize Database & Configure
+**Initialize the database.** Two ways to do this, both equivalent:
 
 ```bash
-python backend/init_db.py
+# Non-interactive: seeds default categories + BAC/Promerica email sources and exits.
+# Cards and any other email sources then get added from the web UI (Cards tab,
+# Settings tab) - this is what Instalar.command uses for non-developer installs.
+venv/bin/python backend/init_db.py --seed-only
+
+# Interactive menu: same seeding (option 1) plus cards/accounts/subscriptions
+# from the terminal instead of the UI, for anyone who prefers the CLI.
+venv/bin/python backend/init_db.py
 ```
 
-This interactive tool lets you:
-- Create the SQLite database (`budgeting.db`)
-- Create default categories
-- Add your cards and accounts
-- **Configure email sources** (bank notification emails)
-
-**Important Setup Steps:**
-1. Choose option `1` → Create default categories
-2. Choose option `2` → Add your cards (with correct last 4 digits!)
-3. Choose option `4` → Add email source:
-   - Example: `notificacion@notificacionesbaccr.com`
-   - Keywords: Optional (not used for filtering - all emails fetched and parsed)
-
----
-
-## Usage
-
-### Sync Transactions from Gmail
-
-```bash
-python backend/sync.py
-```
-
-The sync script will:
-1. Load all configured email sources from database
-2. Ask how many days back to search (default: 30)
-3. Sync from **all active email sources** automatically
-
-**First time running:**
-- Browser will open for Gmail OAuth authentication
-- Grant "Read Gmail" permission
-- Token saved to `token.json` for future use
-
-**What happens:**
-- Fetches emails from all configured sources
-- Parses transaction details (amount, date, commerce, card)
-- Saves to database (skipping duplicates)
-- Shows summary per source and overall totals
-
-**Note:** Make sure you've added at least one email source via `init_db.py` first!
-
-### Run the Web UI
-
-Start the FastAPI server to access the web interface:
-
-```bash
-# Activate virtual environment first
-source venv/bin/activate  # On Mac/Linux
-# or
-venv\Scripts\activate  # On Windows
-
-# Start the API server
-uvicorn backend.api:app --reload --host 0.0.0.0 --port 8000
-```
-
-Then open your browser to:
-- **Web UI:** http://localhost:8000
-- **API Docs:** http://localhost:8000/docs (interactive Swagger UI)
-- **Alternative API Docs:** http://localhost:8000/redoc
-
-The web UI provides:
-- Dashboard with spending overview
-- Transaction management and categorization
-- Card and account management
-- Subscription tracking
-- Balance summaries (manual vs. available)
-
-**Note:** The server runs with `--reload` flag, so it will automatically restart when you make code changes.
-
-### Test Individual Components
-
-**Test Gmail connection:**
-```bash
-python backend/gmail_client.py
-```
-
-**Test email parser:**
-```bash
-python backend/email_parser.py
-```
-
-### Manage Database
-
-```bash
-python backend/init_db.py
-```
-
-Interactive menu options:
-1. Create default categories
+Interactive menu:
+1. Create default categories **and** seed the known-good BAC/Promerica email sources (`NotificacionBAC@baccredomatic.cr`, `alerta@baccredomatic.com`, `info@promerica.fi.cr`) — these are each bank's own sending address, the same for every customer, so new users get a working sync without having to know to add them first
 2. Add a card
 3. Add an account
-4. **Add an email source** (configure bank notification emails)
-5. List cards
-6. List accounts
-7. **List email sources**
-8. Exit
+4. Add an email source (bank notification sender) manually — for a bank other than BAC/Promerica, or a custom address; sync fetches *all* mail from each configured source and parses it; keywords are optional and unused for filtering
+5. Add a subscription
+6-9. List cards / accounts / email sources / subscriptions
+10. Exit
 
-**Managing Email Sources:**
-- Add multiple banks (e.g., BAC, BCR, Promerica)
-- Just provide the sender email address
-- Sync fetches ALL emails from each source and parses them for transaction data
-- No subject filtering - parser intelligently extracts transaction info
+**Symlink the CLI and run it** (what `Instalar.command` does for non-developers):
+
+```bash
+ln -sf "$(pwd)/finance-app" "$(brew --prefix)/bin/finance-app"
+finance-app        # open the dashboard at http://localhost:8000 - add cards there, then click "Sync Now"
+finance-app sync   # equivalent from the terminal; first run triggers the Gmail OAuth flow in the browser
+```
+
+Every day-to-day CLI command also has a UI equivalent in the Settings tab (Sync Now, date-range sync, re-apply category rules, reconnect Gmail) — use whichever you prefer, they call the same backend logic.
+
+Or run the server directly without the CLI: `venv/bin/uvicorn backend.api:app --reload --host 0.0.0.0 --port 8000`.
 
 ---
 
@@ -255,7 +166,7 @@ Your bank emails might have different format. To customize:
    - `card_last_four`: Card number format
    - `date`: Date format
 
-4. Test with: `python backend/email_parser.py`
+4. Test with: `venv/bin/python backend/email_parser.py`
 
 ---
 
@@ -263,20 +174,28 @@ Your bank emails might have different format. To customize:
 
 ```
 budgeting-app/
+├── Instalar.command         # Double-click installer for non-developer users (macOS)
+├── GUIA_DE_USO.md           # Spanish-language setup + usage guide, for friends
+├── finance-app               # CLI wrapper -> backend/manage.py (symlinked onto PATH)
 ├── backend/
-│   ├── __init__.py
-│   ├── database.py          # SQLAlchemy setup
-│   ├── models.py            # Database models
-│   ├── gmail_client.py      # Gmail API wrapper
-│   ├── email_parser.py      # Email parsing logic
-│   ├── sync.py              # Main sync script
-│   └── init_db.py           # Database setup tool
-├── credentials.json         # Gmail OAuth (you provide)
-├── token.json              # Auto-generated after first OAuth
-├── budgeting.db            # SQLite database (auto-generated)
+│   ├── database.py          # SQLAlchemy engine/session setup
+│   ├── models.py             # Card, Account, Category, Transaction, EmailSource, ...
+│   ├── gmail_client.py       # Gmail API wrapper (auth + message fetch)
+│   ├── email_parser.py       # Regex-based parsing of bank email bodies -> txn fields
+│   ├── sync.py                # Pulls mail from active EmailSources, parses, dedupes, inserts
+│   ├── crud.py / schemas.py  # DB access + Pydantic schemas for the API
+│   ├── analytics.py          # Spending summaries/aggregations
+│   ├── api.py                 # FastAPI app, mounts frontend, exposes REST endpoints
+│   ├── manage.py              # finance-app CLI entry point (open/sync/report/etc.)
+│   └── init_db.py             # Interactive setup: categories, cards, accounts, email sources
+├── frontend/
+│   ├── templates/index.html
+│   └── static/{css,js}/      # dashboard, transactions, cards, subscriptions UI
+├── credentials.json          # Gmail OAuth, per-person (you provide, gitignored)
+├── token.json                # Auto-generated after first OAuth (gitignored)
+├── budgeting.db               # SQLite database (auto-generated, gitignored)
 ├── requirements.txt
-├── .gitignore
-└── README.md
+└── .gitignore
 ```
 
 ---
@@ -296,7 +215,7 @@ budgeting-app/
 ### Parsing Issues
 
 **Problem:** Transactions not being parsed correctly
-- Run `python backend/sync.py` and check console output
+- Run `finance-app sync` and check console output
 - Look for "Could not extract amount" warnings
 - Customize patterns in `email_parser.py` to match your bank format
 - Test with sample HTML using the test function
@@ -307,16 +226,6 @@ budgeting-app/
 - Check if you have cards added to database
 - Verify last 4 digits match between card and emails
 - Check keywords match your email subjects
-
----
-
-## Next Steps (Milestone 2)
-
-Coming next:
-- FastAPI backend with REST endpoints
-- Web UI to view/edit transactions
-- Category assignment interface
-- Card and account management
 
 ---
 
