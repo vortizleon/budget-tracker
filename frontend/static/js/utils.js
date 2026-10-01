@@ -156,19 +156,27 @@ function debounce(func, wait) {
 }
 
 /**
- * Show a toast notification (simple alert for now)
+ * Show a toast notification - a small, auto-dismissing message in the
+ * corner, instead of a blocking browser alert() dialog.
  * @param {string} message - Message to display
  * @param {string} type - Type of notification (success, error, info)
  */
 function showNotification(message, type = 'info') {
-    // Simple alert for now - could be enhanced with a proper toast library
-    if (type === 'error') {
-        alert('Error: ' + message);
-    } else if (type === 'success') {
-        alert('Success: ' + message);
-    } else {
-        alert(message);
-    }
+    const container = document.getElementById('toast-container');
+    if (!container) return; // Defensive - shouldn't happen, but never crash on feedback.
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    // Let the initial styles apply before animating in.
+    requestAnimationFrame(() => toast.classList.add('toast-visible'));
+
+    setTimeout(() => {
+        toast.classList.remove('toast-visible');
+        toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+    }, 3000);
 }
 
 /**
