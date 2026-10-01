@@ -845,17 +845,102 @@ function renderSyncStatus(status) {
     document.getElementById('last-sync-time').textContent = `Last sync: ${lastSync}`;
 }
 
-async function triggerSync() {
-    try {
-        showNotification('Sync started...', 'info');
-        const result = await API.Sync.triggerSync();
-        showNotification(`Sync completed: ${result.transactions_found} transactions found`, 'success');
+function reportSyncResult(result) {
+    if (!result.success) {
+        showNotification((result.errors && result.errors[0]) || result.message, 'error');
+        return;
+    }
+    showNotification(
+        `${result.new_transactions} new, ${result.skipped_duplicates} already had it, from ${result.sources_synced} source(s)`,
+        'success'
+    );
+}
 
-        // Reload current view
-        await showView(currentView);
+async function triggerSync() {
+    const btn = document.getElementById('btn-sync-now');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
+    try {
+        showNotification('Sync started - this can take a minute...', 'info');
+        const result = await API.Sync.triggerSync();
+        reportSyncResult(result);
+        await loadSettings();
+        if (currentView !== 'settings') {
+            await showView(currentView);
+        }
     } catch (error) {
         console.error('Sync failed:', error);
         showNotification('Sync failed: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+    }
+}
+
+async function triggerSyncRange() {
+    const startDate = document.getElementById('sync-range-start').value;
+    const endDate = document.getElementById('sync-range-end').value;
+    if (!startDate || !endDate) {
+        showNotification('Pick a start and end date first', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btn-sync-range');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
+    try {
+        showNotification('Sync started - this can take a minute...', 'info');
+        const result = await API.Sync.triggerSyncRange(startDate, endDate);
+        reportSyncResult(result);
+        await loadSettings();
+        if (currentView !== 'settings') {
+            await showView(currentView);
+        }
+    } catch (error) {
+        console.error('Sync failed:', error);
+        showNotification('Sync failed: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+    }
+}
+
+async function triggerRecategorize() {
+    const btn = document.getElementById('btn-recategorize');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Working...';
+    try {
+        const result = await API.Maintenance.recategorize();
+        showNotification(`Checked ${result.checked}, recategorized ${result.updated}`, 'success');
+        if (currentView !== 'settings') {
+            await showView(currentView);
+        }
+    } catch (error) {
+        console.error('Recategorize failed:', error);
+        showNotification('Failed: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+    }
+}
+
+async function triggerReconnectGmail() {
+    const btn = document.getElementById('btn-reconnect-gmail');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Working...';
+    try {
+        await API.Maintenance.reconnectGmail();
+        showNotification('Done - click "Sync Now" to log in to Gmail again', 'success');
+    } catch (error) {
+        console.error('Reconnect failed:', error);
+        showNotification('Failed: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
     }
 }
 
@@ -1351,6 +1436,9 @@ async function saveEmailSource(event) {
 // Make functions globally accessible
 window.showView = showView;
 window.triggerSync = triggerSync;
+window.triggerSyncRange = triggerSyncRange;
+window.triggerRecategorize = triggerRecategorize;
+window.triggerReconnectGmail = triggerReconnectGmail;
 window.closeModal = closeModal;
 window.showAddCardModal = showAddCardModal;
 window.editCard = editCard;

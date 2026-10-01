@@ -276,6 +276,7 @@
 
                 <div class="settings-section">
                     <h3>Email Sources</h3>
+                    <p class="field-hint">The bank addresses the app reads transaction alerts from - not your own email. BAC and Promerica are pre-loaded; add more here if you bank elsewhere.</p>
                     <div id="email-sources-list">
                         <p class="loading">Loading...</p>
                     </div>
@@ -288,7 +289,39 @@
                     <h3>Sync Status</h3>
                     <div id="sync-status">
                         <p id="last-sync-time">Last sync: Never</p>
-                        <button class="btn btn-primary" onclick="triggerSync()">Sync Now</button>
+                        <button id="btn-sync-now" class="btn btn-primary" onclick="triggerSync()">Sync Now</button>
+                    </div>
+                    <p class="field-hint">Brings in any new transactions from the last 30 days. Do this weekly to keep things current.</p>
+
+                    <details class="maintenance-action">
+                        <summary>Missing a gap? Sync a specific date range instead</summary>
+                        <div class="date-range-row">
+                            <input type="date" id="sync-range-start" class="input">
+                            <span>to</span>
+                            <input type="date" id="sync-range-end" class="input">
+                            <button id="btn-sync-range" class="btn btn-secondary" onclick="triggerSyncRange()">Sync Range</button>
+                        </div>
+                        <p class="field-hint">Use this instead of "Sync Now" to backfill a known gap (e.g. you skipped a few weeks) without re-checking everything since.</p>
+                    </details>
+                </div>
+
+                <div class="settings-section">
+                    <h3>App Controls</h3>
+
+                    <div class="maintenance-action">
+                        <div>
+                            <strong>Re-apply category rules</strong>
+                            <p class="field-hint">Run this after you add or edit a rule in Categories - it sorts your already-synced "Uncategorized" transactions using the new rule.</p>
+                        </div>
+                        <button id="btn-recategorize" class="btn btn-secondary" onclick="triggerRecategorize()">Re-apply Rules</button>
+                    </div>
+
+                    <div class="maintenance-action">
+                        <div>
+                            <strong>Reconnect Gmail</strong>
+                            <p class="field-hint">If syncing stops working with a login/permission error, click this, then click "Sync Now" above to log in again.</p>
+                        </div>
+                        <button id="btn-reconnect-gmail" class="btn btn-secondary" onclick="triggerReconnectGmail()">Reconnect Gmail</button>
                     </div>
                 </div>
             </div>
@@ -503,14 +536,20 @@
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
             <div class="modal-body">
+                <p class="field-hint" style="margin-bottom: 16px;">
+                    This is <strong>not your own email</strong> - it's your bank's address, the one
+                    <em>they</em> send you transaction alerts from (check your inbox for one of their
+                    notification emails and copy the sender's address). The app reads every email sent
+                    from this address and looks for transaction details in it.
+                </p>
                 <form id="email-source-form" onsubmit="saveEmailSource(event)">
                     <div class="form-group">
                         <label>Source Name</label>
-                        <input type="text" id="source-name" class="input" required>
+                        <input type="text" id="source-name" class="input" placeholder="e.g. BAC, Promerica" required>
                     </div>
                     <div class="form-group">
-                        <label>Email Address</label>
-                        <input type="email" id="source-email" class="input" required>
+                        <label>Bank's Sender Email Address</label>
+                        <input type="email" id="source-email" class="input" placeholder="e.g. notificacion@yourbank.com" required>
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">Save</button>

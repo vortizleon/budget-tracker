@@ -523,12 +523,28 @@ const EmailSourcesAPI = {
 
 const SyncAPI = {
     /**
-     * Trigger Gmail sync
+     * Trigger Gmail sync for a rolling window of days (default: last 30).
+     * @param {number} daysBack
      * @returns {Promise<object>} Sync result
      */
-    async triggerSync() {
-        return apiRequest('/api/sync/gmail', {
+    async triggerSync(daysBack = 30) {
+        return apiRequest('/api/sync/trigger', {
             method: 'POST',
+            body: JSON.stringify({ days_back: daysBack }),
+        });
+    },
+
+    /**
+     * Trigger Gmail sync for an explicit date range (inclusive), to backfill
+     * a specific gap instead of re-pulling the whole rolling window.
+     * @param {string} startDate - YYYY-MM-DD
+     * @param {string} endDate - YYYY-MM-DD
+     * @returns {Promise<object>} Sync result
+     */
+    async triggerSyncRange(startDate, endDate) {
+        return apiRequest('/api/sync/trigger', {
+            method: 'POST',
+            body: JSON.stringify({ start_date: startDate, end_date: endDate }),
         });
     },
 
@@ -538,6 +554,33 @@ const SyncAPI = {
      */
     async getStatus() {
         return apiRequest('/api/sync/status');
+    },
+};
+
+// ============================================================================
+// Maintenance API
+// ============================================================================
+
+const MaintenanceAPI = {
+    /**
+     * Re-apply categorization rules to existing transactions.
+     * @param {boolean} all - re-check every transaction, not just Uncategorized ones
+     * @returns {Promise<object>} { checked, updated }
+     */
+    async recategorize(all = false) {
+        return apiRequest(`/api/maintenance/recategorize?all=${all}`, {
+            method: 'POST',
+        });
+    },
+
+    /**
+     * Discard the stored Gmail token so the next sync prompts a fresh login.
+     * @returns {Promise<object>} { reconnected, had_existing_token }
+     */
+    async reconnectGmail() {
+        return apiRequest('/api/maintenance/reconnect-gmail', {
+            method: 'POST',
+        });
     },
 };
 
@@ -552,4 +595,5 @@ window.API = {
     Analytics: AnalyticsAPI,
     EmailSources: EmailSourcesAPI,
     Sync: SyncAPI,
+    Maintenance: MaintenanceAPI,
 };

@@ -418,6 +418,10 @@ class TransactionFilters(BaseModel):
 class SyncRequest(BaseModel):
     """Schema for triggering sync."""
     days_back: int = Field(30, ge=1, le=365)
+    # Explicit range for backfilling a specific gap - takes priority over
+    # days_back when given (end_date is inclusive).
+    start_date: Optional[str] = None  # YYYY-MM-DD
+    end_date: Optional[str] = None  # YYYY-MM-DD
 
 
 class SyncResponse(BaseModel):

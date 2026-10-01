@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -696,61 +696,104 @@ async def trigger_sync(
     sync_request: schemas.SyncRequest,
     db: Session = Depends(get_db)
 ):
-    """Trigger Gmail sync."""
+    """Trigger Gmail sync - either a rolling N-day window (days_back) or an
+    explicit start_date/end_date backfill, same as `finance-app sync`."""
+    email_sources = crud.get_email_sources(db, active_only=True)
+
+    if not email_sources:
+        return schemas.SyncResponse(
+            success=False,
+            message="No email sources configured",
+            new_transactions=0,
+            skipped_duplicates=0,
+            sources_synced=0,
+            errors=["No active email sources found"]
+        )
+
     try:
-        # Get active email sources
-        email_sources = crud.get_email_sources(db, active_only=True)
+        after_date = datetime.strptime(sync_request.start_date, "%Y-%m-%d") if sync_request.start_date else None
+        # Gmail's "before:" is exclusive, so bump by a day to include end_date itself.
+        before_date = (
+            datetime.strptime(sync_request.end_date, "%Y-%m-%d") + timedelta(days=1)
+            if sync_request.end_date else None
+        )
 
-        if not email_sources:
-            return schemas.SyncResponse(
-                success=False,
-                message="No email sources configured",
-                new_transactions=0,
-                skipped_duplicates=0,
-                sources_synced=0,
-                errors=["No active email sources found"]
-            )
-
-        # Create syncer
         syncer = TransactionSyncer(db)
-
-        total_new = 0
-        total_skipped = 0
-        errors = []
-
-        # Sync from all sources
-        for source in email_sources:
-            try:
-                emails = syncer.gmail_client.fetch_bank_emails(
-                    bank_email=source.email_address,
-                    keywords=source.get_keywords_list() if source.subject_keywords else None,
-                    days_back=sync_request.days_back,
-                    max_results=100
-                )
-
-                if emails:
-                    parsed_transactions = syncer.parser.parse_email_batch(emails)
-
-                    for transaction_data in parsed_transactions:
-                        if syncer.save_transaction(transaction_data):
-                            total_new += 1
-                        else:
-                            total_skipped += 1
-
-            except Exception as e:
-                errors.append(f"Error syncing {source.name}: {str(e)}")
+        result = syncer.sync_all_active_sources(
+            days_back=sync_request.days_back,
+            after_date=after_date,
+            before_date=before_date,
+        )
 
         return schemas.SyncResponse(
-            success=len(errors) == 0,
-            message=f"Synced {total_new} new transactions from {len(email_sources)} sources",
-            new_transactions=total_new,
-            skipped_duplicates=total_skipped,
+            success=True,
+            message=f"Synced {result['total_saved']} new transactions from {len(email_sources)} sources",
+            new_transactions=result['total_saved'],
+            skipped_duplicates=result['total_skipped'],
             sources_synced=len(email_sources),
-            errors=errors if errors else None
         )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/maintenance/recategorize")
+async def recategorize_transactions(all: bool = False, db: Session = Depends(get_db)):
+    """Re-apply categorization rules to existing transactions - mirrors
+    `finance-app recategorize`. Only touches `Uncategorized` transactions
+    unless `all=true`. Deliberately doesn't go through TransactionSyncer
+    (which opens a Gmail connection on init) since this never touches Gmail."""
+    recategorize_all = all
+    query = db.query(models.Transaction)
+    if not recategorize_all:
+        uncategorized = db.query(models.Category).filter(models.Category.name == "Uncategorized").first()
+        if uncategorized:
+            query = query.filter(models.Transaction.category_id == uncategorized.id)
+
+    rules = db.query(models.CategorizationRule).filter(
+        models.CategorizationRule.is_active == True
+    ).order_by(models.CategorizationRule.priority.desc()).all()
+
+    def match(commerce_name):
+        if not commerce_name:
+            return None
+        name = commerce_name.strip().upper()
+        for rule in rules:
+            pattern = rule.commerce_pattern.strip().upper()
+            if pattern.startswith('%') and pattern.endswith('%') and len(pattern) > 1:
+                if pattern[1:-1] in name:
+                    return rule.category_id
+            elif pattern.endswith('%'):
+                if name.startswith(pattern[:-1]):
+                    return rule.category_id
+            elif pattern.startswith('%'):
+                if name.endswith(pattern[1:]):
+                    return rule.category_id
+            elif name == pattern:
+                return rule.category_id
+        return None
+
+    transactions = query.all()
+    updated = 0
+    for txn in transactions:
+        category_id = match(txn.commerce_name)
+        if category_id and category_id != txn.category_id:
+            txn.category_id = category_id
+            updated += 1
+
+    db.commit()
+    return {"checked": len(transactions), "updated": updated}
+
+
+@app.post("/api/maintenance/reconnect-gmail")
+async def reconnect_gmail():
+    """Discard the stored Gmail token, same as `finance-app refresh-oauth` -
+    the next sync will prompt a fresh login in the browser."""
+    token_path = Path(__file__).resolve().parent.parent / "token.json"
+    existed = token_path.exists()
+    if existed:
+        token_path.unlink()
+    return {"reconnected": True, "had_existing_token": existed}
 
 
 @app.get("/api/sync/status")

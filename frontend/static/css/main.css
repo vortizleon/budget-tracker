@@ -677,6 +677,51 @@ input[type="color"].input::-moz-color-swatch {
     color: var(--text-primary);
 }
 
+.maintenance-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.maintenance-action:first-of-type {
+    border-top: none;
+    padding-top: 0;
+}
+
+.maintenance-action > div {
+    flex: 1;
+}
+
+.maintenance-action .btn {
+    flex-shrink: 0;
+}
+
+details.maintenance-action {
+    display: block;
+    margin-top: var(--spacing-md);
+}
+
+details.maintenance-action summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--primary);
+}
+
+details.maintenance-action .date-range-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+details.maintenance-action .date-range-row .input {
+    width: auto;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .sidebar {
