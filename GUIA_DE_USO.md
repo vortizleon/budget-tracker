@@ -1,14 +1,5 @@
 # Guía de uso — Budget Tracker
 
-Esta guía te lleva paso a paso desde "no tengo nada instalado" hasta usar la
-app para ver en qué se te va la plata cada mes. Es para tu Mac — no funciona
-en Windows.
-
-No necesitas saber programar. Solo vas a copiar y pegar un par de cosas y
-hacer clic en algunos botones.
-
----
-
 ## 1. Descargar la app
 
 1. Abre esta página en tu navegador: https://github.com/vortizleon/budget-tracker
