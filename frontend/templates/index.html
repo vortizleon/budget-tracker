@@ -3,7 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budgeting App</title>
+    <title>Budget Tracker</title>
+    <script>
+        // Applied before CSS/paint so there's no flash of the wrong theme.
+        (function () {
+            try {
+                var saved = localStorage.getItem('theme');
+                var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+            } catch (error) {
+                // localStorage/matchMedia unavailable - just defaults to light.
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="/static/css/main.css">
     <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/static/css/cards.css">
@@ -13,7 +25,14 @@
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h1 class="app-title">Budgeting</h1>
+                <h1 class="app-title">Budget Tracker</h1>
+                <div class="sidebar-header-actions">
+                    <button class="icon-btn theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">
+                        <svg id="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                        <svg id="theme-icon-sun" hidden xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                    </button>
+                    <button class="icon-btn" id="privacy-toggle" onclick="togglePrivacyMode()" title="Hide/show amounts">👁️</button>
+                </div>
             </div>
             <nav class="sidebar-nav">
                 <a href="#" data-view="dashboard" class="nav-link active">
@@ -53,11 +72,11 @@
                     <div class="summary-cards">
                         <div class="summary-card">
                             <div class="summary-label">Total Spent (CRC)</div>
-                            <div class="summary-value" id="summary-spent-crc">₡0.00</div>
+                            <div class="summary-value money-value" id="summary-spent-crc">₡0.00</div>
                         </div>
                         <div class="summary-card">
                             <div class="summary-label">Total Spent (USD)</div>
-                            <div class="summary-value" id="summary-spent-usd">$0.00</div>
+                            <div class="summary-value money-value" id="summary-spent-usd">$0.00</div>
                         </div>
                         <div class="summary-card">
                             <div class="summary-label">Transactions</div>
@@ -75,11 +94,11 @@
                     <div class="summary-cards">
                         <div class="summary-card">
                             <div class="summary-label">Spent (CRC)</div>
-                            <div class="summary-value" id="this-month-crc">₡0.00</div>
+                            <div class="summary-value money-value" id="this-month-crc">₡0.00</div>
                         </div>
                         <div class="summary-card">
                             <div class="summary-label">Spent (USD)</div>
-                            <div class="summary-value" id="this-month-usd">$0.00</div>
+                            <div class="summary-value money-value" id="this-month-usd">$0.00</div>
                         </div>
                         <div class="summary-card">
                             <div class="summary-label">Needs a Category</div>

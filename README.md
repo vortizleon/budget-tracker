@@ -1,4 +1,4 @@
-# Personal Budgeting App
+# Budget Tracker
 
 A simple app that automatically imports bank receipts from Gmail and helps manage personal finances. Built for Costa Rican banks (BAC, Promerica) but the email parser and categorization rules are fully customizable for others.
 

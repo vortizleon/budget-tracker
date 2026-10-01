@@ -22,8 +22,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function initializeApp() {
     setupNavigation();
+    initTheme();
+    initPrivacyMode();
     loadInitialData();
     showView('dashboard');
+}
+
+// ============================================================================
+// Theme (dark/light mode)
+// ============================================================================
+
+function initTheme() {
+    // The inline <script> in <head> already applied the right data-theme
+    // attribute before first paint (to avoid a flash) - this just syncs the
+    // toggle button's icon to match.
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    updateThemeToggleIcon(isDark);
+}
+
+function toggleTheme() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const next = !isDark;
+
+    if (next) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+    updateThemeToggleIcon(next);
+
+    try {
+        localStorage.setItem('theme', next ? 'dark' : 'light');
+    } catch (error) {
+        // Ignore - just won't persist across reloads.
+    }
+
+    // Charts bake their colors in at render time, so they need a fresh
+    // render to pick up the new theme - everything else is pure CSS.
+    if (currentView === 'analytics') {
+        loadAnalytics(currentAnalyticsFilters);
+    }
+}
+
+function updateThemeToggleIcon(isDark) {
+    document.getElementById('theme-icon-moon').hidden = isDark;
+    document.getElementById('theme-icon-sun').hidden = !isDark;
+
+    const btn = document.getElementById('theme-toggle');
+    btn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+}
+
+// ============================================================================
+// Privacy Mode (hide/show money amounts)
+// ============================================================================
+
+function initPrivacyMode() {
+    let hidden = false;
+    try {
+        hidden = localStorage.getItem('privacyMode') === 'true';
+    } catch (error) {
+        // localStorage can be unavailable (private browsing, etc.) - default to shown.
+    }
+    setPrivacyMode(hidden);
+}
+
+function togglePrivacyMode() {
+    setPrivacyMode(!document.body.classList.contains('privacy-mode'));
+}
+
+function setPrivacyMode(hidden) {
+    document.body.classList.toggle('privacy-mode', hidden);
+
+    const btn = document.getElementById('privacy-toggle');
+    btn.textContent = hidden ? '🙈' : '👁️';
+    btn.classList.toggle('active', hidden);
+    btn.title = hidden ? 'Show amounts' : 'Hide amounts';
+
+    try {
+        localStorage.setItem('privacyMode', hidden);
+    } catch (error) {
+        // Ignore - just won't persist across reloads.
+    }
 }
 
 /**
@@ -158,7 +237,7 @@ function renderRecentTransactions(transactions) {
                 </div>
             </div>
             <div class="transaction-amount">
-                <div class="transaction-amount-value ${t.transaction_type === 'purchase' ? 'negative' : 'positive'}">
+                <div class="transaction-amount-value money-value ${t.transaction_type === 'purchase' ? 'negative' : 'positive'}">
                     ${formatCurrency(t.amount, t.currency)}
                 </div>
             </div>
@@ -266,7 +345,7 @@ function renderTransactionTotals(totalsByCurrency) {
 
     container.innerHTML = currencies.map(currency => {
         const { total, count } = totalsByCurrency[currency];
-        return `<span class="transaction-totals-item"><strong>${formatCurrency(total, currency)}</strong> across ${count} transaction${count === 1 ? '' : 's'} (${currency})</span>`;
+        return `<span class="transaction-totals-item"><strong class="money-value">${formatCurrency(total, currency)}</strong> across ${count} transaction${count === 1 ? '' : 's'} (${currency})</span>`;
     }).join('');
 }
 
@@ -324,7 +403,7 @@ function renderTransactionsTable(transactions) {
                         ).join('')}
                     </select>
                 </div>
-                <div class="${t.transaction_type === 'purchase' ? 'negative' : 'positive'}">
+                <div class="money-value ${t.transaction_type === 'purchase' ? 'negative' : 'positive'}">
                     ${formatCurrency(t.amount, t.currency)}
                 </div>
                 <div>
@@ -439,7 +518,15 @@ function renderChart(containerId, options) {
     // a new chart on top of the old one every time.
     const el = document.querySelector(containerId);
     el.innerHTML = '';
-    const chart = new ApexCharts(el, options);
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const themedOptions = {
+        ...options,
+        theme: { mode: isDark ? 'dark' : 'light', ...(options.theme || {}) },
+        chart: { background: 'transparent', ...(options.chart || {}) },
+    };
+
+    const chart = new ApexCharts(el, themedOptions);
     chart.render();
 }
 

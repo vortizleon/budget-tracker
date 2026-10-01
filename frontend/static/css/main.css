@@ -50,6 +50,26 @@
 
     /* Sidebar */
     --sidebar-width: 240px;
+
+    color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg-primary: #1F2937;
+    --bg-secondary: #111827;
+    --bg-tertiary: #283241;
+
+    --text-primary: #F9FAFB;
+    --text-secondary: #9CA3AF;
+    --text-tertiary: #6B7280;
+
+    --border-color: #374151;
+
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
 }
 
 body {
@@ -58,6 +78,7 @@ body {
     line-height: 1.6;
     color: var(--text-primary);
     background-color: var(--bg-secondary);
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 /* ============================================================================
@@ -80,8 +101,48 @@ body {
 }
 
 .sidebar-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
     padding: var(--spacing-lg);
     border-bottom: 1px solid var(--border-color);
+}
+
+.app-title {
+    white-space: nowrap;
+}
+
+.sidebar-header-actions {
+    display: flex;
+    gap: 2px;
+}
+
+#theme-toggle,
+#privacy-toggle {
+    font-size: 16px;
+    opacity: 0.6;
+}
+
+#theme-toggle:hover,
+#privacy-toggle:hover,
+#privacy-toggle.active {
+    opacity: 1;
+}
+
+.theme-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+}
+
+/* Privacy mode: blur money figures without touching layout/markup */
+body.privacy-mode .money-value {
+    filter: blur(6px);
+    user-select: none;
+    transition: filter 0.15s ease;
 }
 
 .app-title {
@@ -247,6 +308,29 @@ body {
 
 select.input {
     cursor: pointer;
+}
+
+/* type="color" has its own internal swatch layout that the generic .input
+   padding squashes into a thin bar - give it a fixed, swatch-sized box. */
+input[type="color"].input {
+    width: 60px;
+    height: 40px;
+    padding: 4px;
+    cursor: pointer;
+}
+
+input[type="color"].input::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+input[type="color"].input::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
+}
+
+input[type="color"].input::-moz-color-swatch {
+    border: none;
+    border-radius: 4px;
 }
 
 /* Form Elements */
