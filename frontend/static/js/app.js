@@ -621,6 +621,11 @@ function renderCategoryPieChart(data, containerId, currency) {
         return;
     }
 
+    // ApexCharts draws a white border between donut slices by default,
+    // which shows up as bright lines against dark-mode cards - match the
+    // slice border to the card background instead so it blends in.
+    const cardBg = getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim();
+
     renderChart(containerId, {
         series: data.map(d => parseFloat(d.total_amount)),
         chart: {
@@ -629,6 +634,9 @@ function renderCategoryPieChart(data, containerId, currency) {
         },
         labels: data.map(d => d.category_name),
         colors: data.map(d => d.category_color || '#6B7280'),
+        stroke: {
+            colors: [cardBg]
+        },
         legend: {
             position: 'bottom'
         },
