@@ -116,7 +116,12 @@ body {
 
 .sidebar-header-actions {
     display: flex;
+    align-items: center;
     gap: 2px;
+}
+
+.sidebar-header-actions .lang-switch {
+    margin-left: 4px;
 }
 
 #theme-toggle,

@@ -32,6 +32,10 @@
                         <svg id="theme-icon-sun" class="theme-icon theme-icon-off" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
                     </button>
                     <button class="icon-btn" id="privacy-toggle" onclick="togglePrivacyMode()" title="Hide/show amounts">👁️</button>
+                    <div class="lang-switch" role="group" aria-label="Language">
+                        <button type="button" data-lang-btn="en" onclick="I18N.setLang('en')" title="English">EN</button>
+                        <button type="button" data-lang-btn="es" onclick="I18N.setLang('es')" title="Español">ES</button>
+                    </div>
                 </div>
             </div>
             <nav class="sidebar-nav">
@@ -545,7 +549,7 @@
                     <div class="form-group">
                         <label id="plan-total-amount-label">Total Amount</label>
                         <input type="number" id="plan-total-amount" class="input" step="0.01" min="0.01" required>
-                        <p class="field-hint" id="plan-total-amount-hint">For a plan already in progress elsewhere, enter the <strong>remaining balance</strong>, not the original price.</p>
+                        <p class="field-hint" id="plan-total-amount-hint" data-i18n-html>For a plan already in progress elsewhere, enter the <strong>remaining balance</strong>, not the original price.</p>
                     </div>
                     <div class="form-group">
                         <label>Currency</label>
@@ -695,7 +699,7 @@
             </div>
             <div class="modal-body">
                 <form id="payoff-form" onsubmit="savePayoffPlan(event)">
-                    <p class="field-hint" style="margin-bottom: 16px;">
+                    <p class="field-hint" style="margin-bottom: 16px;" data-i18n-html>
                         Enter what you owe from your bank's app or statement. Colones and dollars are separate balances, each paid in its own currency.
                         <strong>Interest rate</strong> is the annual rate on your statement ("tasa de interés corriente") - with it at 0 the estimate will be too optimistic.
                         New spending defaults to your recent average on this card - lower it to see what cutting back does.
@@ -767,7 +771,7 @@
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <p class="field-hint" style="margin-bottom: 16px;">
+                <p class="field-hint" style="margin-bottom: 16px;" data-i18n-html>
                     This is <strong>not your own email</strong> - it's your bank's address, the one
                     <em>they</em> send you transaction alerts from (check your inbox for one of their
                     notification emails and copy the sender's address). The app reads every email sent
@@ -796,6 +800,8 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="/static/js/locales/es.js"></script>
+    <script src="/static/js/i18n.js"></script>
     <script src="/static/js/utils.js"></script>
     <script src="/static/js/api.js"></script>
     <script src="/static/js/app.js"></script>

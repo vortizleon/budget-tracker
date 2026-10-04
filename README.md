@@ -136,6 +136,12 @@ Or run the server directly without the CLI: `venv/bin/uvicorn backend.api:app --
 
 ---
 
+## Language (English / Spanish)
+
+The app has an EN | ES switch in the sidebar header. The choice is remembered in the browser; the first time it follows the browser language. The Spanish is neutral Latin American (no tú/vos/usted: infinitives and impersonal phrasing) and amounts keep the same `1,234.50` format in both languages.
+
+How it works: the English text in `index.html` / `app.js` is the translation key, and `frontend/static/js/locales/es.js` maps it to Spanish (a missing entry just falls back to English). Static page text is translated in place; text built by JavaScript goes through `_t('...')` (`_tp` for plurals, `_tc` for the default category names). To change a Spanish string, edit `es.js`; when adding UI text, wrap it with `_t(...)` and add the entry - `tests/test_i18n.py` fails if a string has no Spanish entry or breaks the style rules. Another language would be one more file in `locales/` plus a button in the switch.
+
 ## Tests / CI
 
 `requirements-dev.txt` adds `pytest` and `httpx`. Run `venv/bin/python -m pytest tests` - it checks that every module imports, every page is served and the Google credentials upload/auto-detect works, all against a throwaway database. GitHub Actions (`.github/workflows/ci.yml`) repeats a clean install on Linux and macOS for every PR, and also runs `Instalar.command` on a clean Mac.

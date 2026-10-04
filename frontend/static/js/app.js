@@ -20,6 +20,16 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
 });
 
+// Everything JS builds (views, charts, tooltips) is translated when it is rendered, so a
+// language change just re-renders the current view. (Not named "languagechange": browsers
+// fire a native event with that name when the preferred languages change.)
+window.addEventListener('i18n:change', () => {
+    closeModal();   // modal titles/labels are set when a modal opens
+    updateThemeToggleIcon(document.documentElement.getAttribute('data-theme') === 'dark');
+    setPrivacyMode(document.body.classList.contains('privacy-mode'));
+    showView(currentView, { push: false });
+});
+
 async function initializeApp() {
     setupNavigation();
     initTheme();
@@ -87,7 +97,7 @@ function updateThemeToggleIcon(isDark) {
     document.getElementById('theme-icon-sun').classList.toggle('theme-icon-off', !isDark);
 
     const btn = document.getElementById('theme-toggle');
-    btn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    btn.title = isDark ? _t('Switch to light mode') : _t('Switch to dark mode');
 }
 
 // ============================================================================
@@ -114,7 +124,7 @@ function setPrivacyMode(hidden) {
     const btn = document.getElementById('privacy-toggle');
     btn.textContent = hidden ? '🙈' : '👁️';
     btn.classList.toggle('active', hidden);
-    btn.title = hidden ? 'Show amounts' : 'Hide amounts';
+    btn.title = hidden ? _t('Show amounts') : _t('Hide amounts');
 
     try {
         localStorage.setItem('privacyMode', hidden);
@@ -232,9 +242,9 @@ async function loadDashboard() {
         document.getElementById('oldest-date').textContent = summary.oldest_transaction_date ? formatDate(summary.oldest_transaction_date) : '-';
 
         document.getElementById('this-month-label').textContent =
-            `(${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })})`;
+            `(${new Date().toLocaleString(I18N.locale(), { month: 'long', year: 'numeric' })})`;
         document.getElementById('all-time-caption').textContent = summary.oldest_transaction_date
-            ? `(since ${formatDate(summary.oldest_transaction_date)})`
+            ? _t('(since {date})', { date: formatDate(summary.oldest_transaction_date) })
             : '';
 
         // Load recent transactions - excludes future-dated rows (e.g. an
@@ -245,7 +255,7 @@ async function loadDashboard() {
 
     } catch (error) {
         console.error('Failed to load dashboard:', error);
-        showNotification('Failed to load dashboard data', 'error');
+        showNotification(_t('Failed to load dashboard data'), 'error');
     }
 }
 
@@ -253,7 +263,7 @@ function renderRecentTransactions(transactions) {
     const container = document.getElementById('recent-transactions');
 
     if (transactions.length === 0) {
-        container.innerHTML = '<p class="empty-state-text">No transactions yet</p>';
+        container.innerHTML = `<p class="empty-state-text">${_t('No transactions yet')}</p>`;
         return;
     }
 
@@ -261,9 +271,9 @@ function renderRecentTransactions(transactions) {
         <div class="transaction-item">
             <div class="transaction-icon">${getCategoryIcon(t.category)}</div>
             <div class="transaction-details">
-                <div class="transaction-merchant">${escapeHtml(t.commerce_name || 'Unknown')}</div>
+                <div class="transaction-merchant">${escapeHtml(t.commerce_name || _t('Unknown'))}</div>
                 <div class="transaction-meta">
-                    ${formatDate(t.date)} • ${t.category?.name || 'Uncategorized'} • ${t.card?.name || 'No card'}
+                    ${formatDate(t.date)} • ${t.category?.name ? escapeHtml(_tc(t.category.name)) : _t('Uncategorized')} • ${t.card?.name ? escapeHtml(t.card.name) : _t('No card')}
                 </div>
             </div>
             <div class="transaction-amount">
@@ -299,7 +309,7 @@ async function loadBudgets() {
     } catch (error) {
         console.error('Failed to load budgets:', error);
         document.getElementById('budget-lines').innerHTML =
-            '<p class="empty-state-text">Failed to load budgets</p>';
+            `<p class="empty-state-text">${_t('Failed to load budgets')}</p>`;
     }
 }
 
@@ -315,26 +325,26 @@ function renderBudgetSummary(o) {
     const leftEl = document.getElementById('budget-left');
     leftEl.textContent = `${left < 0 ? '-' : ''}${formatCurrency(left, 'CRC')}`;
     leftEl.classList.toggle('budget-over', left < 0);
-    const incomeLabel = received > 0 && received >= base ? 'Income received' : 'Expected income';
+    const incomeLabel = received > 0 && received >= base ? _t('Income received') : _t('Expected income');
     document.getElementById('budget-equation').innerHTML = `
         <div class="budget-eq-row"><span>${incomeLabel}</span>${crc(base)}</div>
-        <div class="budget-eq-row"><span>− Spent so far</span>${crc(spent)}</div>
-        ${debt > 0 ? `<div class="budget-eq-row"><span>− Card debt payment</span>${crc(debt)}</div>` : ''}
-        <div class="budget-eq-row budget-eq-total"><span>= Left to spend</span>${crc(left)}</div>
+        <div class="budget-eq-row"><span>− ${_t('Spent so far')}</span>${crc(spent)}</div>
+        ${debt > 0 ? `<div class="budget-eq-row"><span>− ${_t('Card debt payment')}</span>${crc(debt)}</div>` : ''}
+        <div class="budget-eq-row budget-eq-total"><span>= ${_t('Left to spend')}</span>${crc(left)}</div>
     `;
 
     // Where income goes: locked + other budgets + debt + savings = income.
     const locked = o.lines.filter(l => l.is_protected).reduce((a, l) => a + parseFloat(l.adjusted_amount), 0);
     const flexible = o.lines.filter(l => !l.is_protected).reduce((a, l) => a + parseFloat(l.adjusted_amount), 0);
     const savings = Math.max(parseFloat(o.unbudgeted), 0);
-    const lockedNames = o.lines.filter(l => l.is_protected).map(l => l.category_name).join(' & ') || 'Locked budgets';
+    const lockedNames = o.lines.filter(l => l.is_protected).map(l => _tc(l.category_name)).join(' & ') || _t('Locked budgets');
     const reduction = parseFloat(o.reduction_percentage);
     const parts = [
         { label: `🔒 ${escapeHtml(lockedNames)}`, value: locked, cls: 'plan-locked' },
-        { label: 'Other budgets', value: flexible, cls: 'plan-flexible',
-          note: reduction > 0 ? `cut ${reduction.toFixed(1)}% for debt` : '' },
-        { label: 'Card debt', value: debt, cls: 'plan-debt' },
-        { label: 'Savings (not budgeted)', value: savings, cls: 'plan-savings' },
+        { label: _t('Other budgets'), value: flexible, cls: 'plan-flexible',
+          note: reduction > 0 ? _t('cut {pct}% for debt', { pct: reduction.toFixed(1) }) : '' },
+        { label: _t('Card debt'), value: debt, cls: 'plan-debt' },
+        { label: _t('Savings (not budgeted)'), value: savings, cls: 'plan-savings' },
     ].filter(p => p.value > 0);
     const total = Math.max(base, parts.reduce((a, p) => a + p.value, 0)) || 1;
 
@@ -353,8 +363,8 @@ function renderBudgetSummary(o) {
     const shortfall = parseFloat(o.debt_shortfall);
     const unbudgeted = parseFloat(o.unbudgeted);
     document.getElementById('budget-plan-note').innerHTML = shortfall > 0
-        ? `<span class="budget-over">Card debt is ${crc(shortfall)} more than everything that isn't locked - lower the payment or unlock a budget.</span>`
-        : (unbudgeted < 0 ? `<span class="budget-over">Budgets add up to ${crc(-unbudgeted)} more than your income.</span>` : '');
+        ? `<span class="budget-over">${_t("Card debt is {amount} more than everything that isn't locked - lower the payment or unlock a budget.", { amount: crc(shortfall) })}</span>`
+        : (unbudgeted < 0 ? `<span class="budget-over">${_t('Budgets add up to {amount} more than your income.', { amount: crc(-unbudgeted) })}</span>` : '');
 
     renderBudgetDebt(o);
 }
@@ -362,7 +372,7 @@ function renderBudgetSummary(o) {
 function renderBudgetDebt(o) {
     const container = document.getElementById('budget-debt-list');
     if (o.debt_lines.length === 0) {
-        container.innerHTML = '<p class="field-hint">No card debt this month. To plan paying one down, open Cards and click 💰 on the card.</p>';
+        container.innerHTML = `<p class="field-hint">${_t('No card debt this month. To plan paying one down, open Cards and click 💰 on the card.')}</p>`;
         return;
     }
 
@@ -378,17 +388,19 @@ function renderBudgetDebt(o) {
             const charges = Math.min(totalCharges, payment);
             const toDebt = payment - charges;
             const money = (v, cur = currency) => `<span class="money-value">${formatCurrency(v, cur)}</span>`;
-            const name = currency === 'CRC' ? 'Colones' : 'Dollars';
+            const name = currency === 'CRC' ? _t('Colones') : _t('Dollars');
             const covers = [];
-            if (usual > 0) covers.push(`${money(usual)} for your usual ${currency === 'CRC' ? 'colón' : 'dollar'} purchases on this card (monthly average)`);
-            if (cuotas > 0) covers.push(`${money(cuotas)} for this month's Tasa Cero cuotas`);
-            let text = `You pay ${money(payment)}`;
+            if (usual > 0) covers.push(currency === 'CRC'
+                ? _t('{amount} for your usual colón purchases on this card (monthly average)', { amount: money(usual) })
+                : _t('{amount} for your usual dollar purchases on this card (monthly average)', { amount: money(usual) }));
+            if (cuotas > 0) covers.push(_t("{amount} for this month's Tasa Cero cuotas", { amount: money(cuotas) }));
+            let text = _t('You pay {amount}', { amount: money(payment) });
             if (charges > 0) {
                 text += toDebt > 0
-                    ? `. First ${covers.join(' + ')}, so ${money(toDebt)} is left to pay down the old balance`
-                    : `, but it only covers ${covers.join(' + ')} - nothing is left to pay down the old balance`;
+                    ? _t('. First {covers}, so {amount} is left to pay down the old balance', { covers: covers.join(' + '), amount: money(toDebt) })
+                    : _t(', but it only covers {covers} - nothing is left to pay down the old balance', { covers: covers.join(' + ') });
             } else {
-                text += ` - all of it pays down the old balance`;
+                text += _t(' - all of it pays down the old balance');
             }
             if (currency === 'USD' && toDebt > 0) text += ` (${money(toDebt * rate, 'CRC')})`;
             return `<div class="budget-debt-row"><strong>${name}:</strong> ${text}</div>`;
@@ -397,19 +409,19 @@ function renderBudgetDebt(o) {
             <div class="budget-debt-card">
                 <div class="budget-debt-header">
                     <strong>💳 ${escapeHtml(d.card_name)}</strong>
-                    <span><span class="budget-debt-amount money-value">${formatCurrency(d.amount, 'CRC')}</span> toward old debt</span>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="showPayoffPlan(${d.card_id})">Edit plan</button>
+                    <span><span class="budget-debt-amount money-value">${formatCurrency(d.amount, 'CRC')}</span> ${_t('toward old debt')}</span>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="showPayoffPlan(${d.card_id})">${_t('Edit plan')}</button>
                 </div>
                 ${rows}
             </div>
         `;
-    }).join('') + '<p class="field-hint">Your usual purchases and cuotas are already counted in your category budgets below, so here only the part of the payment that pays down the old balance counts as debt.</p>';
+    }).join('') + `<p class="field-hint">${_t('Your usual purchases and cuotas are already counted in your category budgets below, so here only the part of the payment that pays down the old balance counts as debt.')}</p>`;
 }
 
 function renderIncomeEntries(o) {
     const [year, month] = o.month.split('-').map(Number);
     document.getElementById('budget-income-caption').textContent =
-        `(${new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' })})`;
+        `(${new Date(year, month - 1, 1).toLocaleString(I18N.locale(), { month: 'long', year: 'numeric' })})`;
 
     const expectedInput = document.getElementById('budget-expected-income');
     const rateInput = document.getElementById('budget-usd-rate');
@@ -418,21 +430,21 @@ function renderIncomeEntries(o) {
 
     const container = document.getElementById('income-entries-list');
     if (o.income_entries.length === 0) {
-        container.innerHTML = '<p class="empty-state-text">No payments logged this month yet - click "+ Add Payment" when you get paid.</p>';
+        container.innerHTML = `<p class="empty-state-text">${_t('No payments logged this month yet - click "+ Add Payment" when you get paid.')}</p>`;
         return;
     }
 
     container.innerHTML = o.income_entries.map(e => `
         <div class="plan-item">
             <div class="plan-info">
-                <strong>${escapeHtml(e.description || 'Payment')}</strong>
+                <strong>${escapeHtml(e.description || _t('Payment'))}</strong>
                 <span class="plan-meta">
                     ${formatDate(e.date)} -
                     <span class="money-value">${formatCurrency(e.amount, e.currency)}</span>
                     ${e.currency === 'USD' ? `(<span class="money-value">${formatCurrency(e.amount_crc, 'CRC')}</span>)` : ''}
                 </span>
             </div>
-            <button type="button" class="icon-btn" onclick="deleteIncome(${e.id})" title="Delete payment">🗑️</button>
+            <button type="button" class="icon-btn" onclick="deleteIncome(${e.id})" title="${_t('Delete payment')}">🗑️</button>
         </div>
     `).join('');
 }
@@ -443,14 +455,14 @@ function renderBudgetLines(o) {
     const reduced = parseFloat(o.reduction_percentage) > 0;
 
     if (o.lines.length === 0) {
-        container.innerHTML = '<p class="empty-state-text">No budgets yet - add one below, or click "Reset to Suggested".</p>';
+        container.innerHTML = `<p class="empty-state-text">${_t('No budgets yet - add one below, or click "Reset to Suggested".')}</p>`;
     } else {
         container.innerHTML = `
             <div class="budget-line budget-line-head">
-                <span>Category</span>
-                <span>% of Income</span>
-                <span>Amount (₡)</span>
-                <span>Spent</span>
+                <span>${_t('Category')}</span>
+                <span>${_t('% of Income')}</span>
+                <span>${_t('Amount (₡)')}</span>
+                <span>${_t('Spent')}</span>
                 <span></span>
             </div>
         ` + o.lines.map(l => {
@@ -461,31 +473,31 @@ function renderBudgetLines(o) {
             const ratio = amount > 0 ? spent / amount : (spent > 0 ? 1 : 0);
             const fillClass = ratio > 1 ? 'critical' : (ratio > 0.85 ? 'high' : '');
             const remainingText = remaining >= 0
-                ? `<span class="money-value">${formatCurrency(remaining, 'CRC')}</span> left`
-                : `<span class="money-value">${formatCurrency(remaining, 'CRC')}</span> over`;
+                ? `<span class="money-value">${formatCurrency(remaining, 'CRC')}</span> ${_t('left')}`
+                : `<span class="money-value">${formatCurrency(remaining, 'CRC')}</span> ${_t('over')}`;
             return `
                 <div class="budget-line">
                     <span class="budget-category">
                         <button type="button" class="icon-btn budget-lock ${l.is_protected ? 'locked' : ''}"
                             onclick="toggleBudgetProtected(${l.id}, ${!l.is_protected})"
-                            title="${l.is_protected ? 'Protected - never reduced for debt. Click to unlock.' : 'Reduced to make room for debt payments. Click to protect.'}">${l.is_protected ? '🔒' : '🔓'}</button>
+                            title="${l.is_protected ? _t('Protected - never reduced for debt. Click to unlock.') : _t('Reduced to make room for debt payments. Click to protect.')}">${l.is_protected ? '🔒' : '🔓'}</button>
                         <span class="category-icon">${escapeHtml(l.category_icon || '')}</span>
-                        ${escapeHtml(l.category_name)}
+                        ${escapeHtml(_tc(l.category_name))}
                     </span>
                     <span class="budget-input-wrap">
                         <input type="number" class="input budget-input ${l.anchor === 'percentage' ? 'anchored' : ''}"
                             value="${parseFloat(l.percentage)}" min="0" max="100" step="0.5"
-                            title="${l.anchor === 'percentage' ? 'You set this % - the amount follows your income' : 'Calculated from the fixed amount'}"
+                            title="${l.anchor === 'percentage' ? _t('You set this % - the amount follows your income') : _t('Calculated from the fixed amount')}"
                             onchange="updateBudget(${l.category_id}, 'percentage', this.value)">
                         <span class="budget-input-suffix">%</span>
                     </span>
                     <span class="budget-amount-wrap">
                         <input type="number" class="input budget-input money-value ${l.anchor === 'amount' ? 'anchored' : ''}"
                             value="${planned}" min="0" step="1000"
-                            title="${l.anchor === 'amount' ? 'Fixed amount - stays the same when income changes' : 'Calculated from the %'}"
+                            title="${l.anchor === 'amount' ? _t('Fixed amount - stays the same when income changes') : _t('Calculated from the %')}"
                             onchange="updateBudget(${l.category_id}, 'amount', this.value)">
                         ${reduced && !l.is_protected
-                            ? `<span class="budget-after-debt">→ <span class="money-value">${formatCurrency(amount, 'CRC')}</span> after debt</span>`
+                            ? `<span class="budget-after-debt">→ <span class="money-value">${formatCurrency(amount, 'CRC')}</span> ${_t('after debt')}</span>`
                             : ''}
                     </span>
                     <span class="budget-progress">
@@ -495,7 +507,7 @@ function renderBudgetLines(o) {
                         </span>
                         <span class="budget-bar"><span class="budget-fill ${fillClass}" style="width: ${Math.min(ratio, 1) * 100}%"></span></span>
                     </span>
-                    <button type="button" class="icon-btn" onclick="deleteBudget(${l.id})" title="Remove budget">🗑️</button>
+                    <button type="button" class="icon-btn" onclick="deleteBudget(${l.id})" title="${_t('Remove budget')}">🗑️</button>
                 </div>
             `;
         }).join('');
@@ -505,14 +517,14 @@ function renderBudgetLines(o) {
     const available = allCategories.filter(c => c.category_type !== 'income' && !budgeted.has(c.id));
     const select = document.getElementById('budget-add-category');
     select.innerHTML = available.length
-        ? available.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')
-        : '<option value="">All categories have a budget</option>';
+        ? available.map(c => `<option value="${c.id}">${escapeHtml(_tc(c.name))}</option>`).join('')
+        : `<option value="">${_t('All categories have a budget')}</option>`;
 }
 
 async function updateBudget(categoryId, field, rawValue) {
     const value = parseFloat(rawValue);
     if (isNaN(value) || value < 0 || (field === 'percentage' && value > 100)) {
-        showNotification(field === 'percentage' ? 'Enter a % between 0 and 100' : 'Enter a positive amount', 'error');
+        showNotification(field === 'percentage' ? _t('Enter a % between 0 and 100') : _t('Enter a positive amount'), 'error');
         await loadBudgets();
         return;
     }
@@ -522,7 +534,7 @@ async function updateBudget(categoryId, field, rawValue) {
         await loadBudgets();
     } catch (error) {
         console.error('Failed to update budget:', error);
-        showNotification(`Failed to update budget: ${error.message}`, 'error');
+        showNotification(_t('Failed to update budget: {error}', { error: _t(error.message) }), 'error');
     }
 }
 
@@ -532,7 +544,7 @@ async function toggleBudgetProtected(budgetId, isProtected) {
         await loadBudgets();
     } catch (error) {
         console.error('Failed to update budget:', error);
-        showNotification('Failed to update budget', 'error');
+        showNotification(_t('Failed to update budget'), 'error');
     }
 }
 
@@ -545,7 +557,7 @@ async function addBudgetCategory() {
         await loadBudgets();
     } catch (error) {
         console.error('Failed to add budget:', error);
-        showNotification(`Failed to add budget: ${error.message}`, 'error');
+        showNotification(_t('Failed to add budget: {error}', { error: _t(error.message) }), 'error');
     }
 }
 
@@ -555,20 +567,20 @@ async function deleteBudget(budgetId) {
         await loadBudgets();
     } catch (error) {
         console.error('Failed to delete budget:', error);
-        showNotification('Failed to delete budget', 'error');
+        showNotification(_t('Failed to delete budget'), 'error');
     }
 }
 
 async function resetBudgetsToSuggested() {
-    if (!confirm('Replace all your budgets with the suggested percentages?')) return;
+    if (!confirm(_t('Replace all your budgets with the suggested percentages?'))) return;
 
     try {
         await API.Budgets.resetToSuggested();
-        showNotification('Budgets reset to suggested', 'success');
+        showNotification(_t('Budgets reset to suggested'), 'success');
         await loadBudgets();
     } catch (error) {
         console.error('Failed to reset budgets:', error);
-        showNotification('Failed to reset budgets', 'error');
+        showNotification(_t('Failed to reset budgets'), 'error');
     }
 }
 
@@ -576,7 +588,7 @@ async function saveBudgetSettings() {
     const expected = document.getElementById('budget-expected-income').value;
     const rate = parseFloat(document.getElementById('budget-usd-rate').value);
     if (isNaN(rate) || rate <= 0) {
-        showNotification('Enter a valid USD → CRC rate', 'error');
+        showNotification(_t('Enter a valid USD → CRC rate'), 'error');
         return;
     }
 
@@ -585,15 +597,17 @@ async function saveBudgetSettings() {
             expected_monthly_income: expected === '' ? null : parseFloat(expected),
             usd_to_crc_rate: rate,
         });
-        showNotification('Budget settings saved', 'success');
+        showNotification(_t('Budget settings saved'), 'success');
         await loadBudgets();
     } catch (error) {
         console.error('Failed to save budget settings:', error);
-        showNotification(`Failed to save settings: ${error.message}`, 'error');
+        showNotification(_t('Failed to save settings: {error}', { error: _t(error.message) }), 'error');
     }
 }
 
 function ordinal(n) {
+    // Spanish: "1.er pago", "2.º pago" (masculine, before the noun).
+    if (I18N.lang() === 'es') return n === 1 || n === 3 ? `${n}.er` : `${n}.º`;
     const suffix = { 1: 'st', 2: 'nd', 3: 'rd' }[n % 100 >= 11 && n % 100 <= 13 ? 0 : n % 10] || 'th';
     return `${n}${suffix}`;
 }
@@ -607,7 +621,7 @@ function showIncomeModal() {
     document.getElementById('income-date').value = today.startsWith(month) ? today : `${month}-01`;
 
     const count = currentBudgetOverview ? currentBudgetOverview.income_entries.length : 0;
-    document.getElementById('income-description').value = `${ordinal(count + 1)} payment`;
+    document.getElementById('income-description').value = _t('{ordinal} payment', { ordinal: ordinal(count + 1) });
 
     document.getElementById('modal-overlay').style.display = 'block';
     document.getElementById('modal-income').style.display = 'block';
@@ -626,25 +640,25 @@ async function saveIncome(event) {
     try {
         await API.Income.create(data);
         closeModal();
-        showNotification('Payment added', 'success');
+        showNotification(_t('Payment added'), 'success');
         // Jump to the month the payment landed in so it's visible.
         document.getElementById('budget-month').value = data.date.slice(0, 7);
         await loadBudgets();
     } catch (error) {
         console.error('Failed to add payment:', error);
-        showNotification(`Failed to add payment: ${error.message}`, 'error');
+        showNotification(_t('Failed to add payment: {error}', { error: _t(error.message) }), 'error');
     }
 }
 
 async function deleteIncome(incomeId) {
-    if (!confirm('Delete this payment?')) return;
+    if (!confirm(_t('Delete this payment?'))) return;
 
     try {
         await API.Income.delete(incomeId);
         await loadBudgets();
     } catch (error) {
         console.error('Failed to delete payment:', error);
-        showNotification('Failed to delete payment', 'error');
+        showNotification(_t('Failed to delete payment'), 'error');
     }
 }
 
@@ -659,7 +673,7 @@ async function loadCards() {
         renderCards(cards);
     } catch (error) {
         console.error('Failed to load cards:', error);
-        showNotification('Failed to load cards', 'error');
+        showNotification(_t('Failed to load cards'), 'error');
     }
 }
 
@@ -670,8 +684,8 @@ function renderCards(cards) {
         container.innerHTML = `
             <div class="cards-empty">
                 <div class="cards-empty-icon">💳</div>
-                <div class="cards-empty-text">No cards yet</div>
-                <button class="btn btn-primary" onclick="showAddCardModal()">Add Your First Card</button>
+                <div class="cards-empty-text">${_t('No cards yet')}</div>
+                <button class="btn btn-primary" onclick="showAddCardModal()">${_t('Add Your First Card')}</button>
             </div>
         `;
         return;
@@ -686,12 +700,12 @@ function renderCards(cards) {
         return `
             <div class="credit-card" style="background: ${cardGradient};" onclick="editCard(${card.id})">
                 <div class="card-actions">
-                    ${card.card_type !== 'debit' ? `<button class="card-action-btn" onclick="event.stopPropagation(); showPayoffPlan(${card.id})" title="Payoff Plan">💰</button>` : ''}
-                    ${card.cutoff_day ? `<button class="card-action-btn" onclick="event.stopPropagation(); showBillingCycles(${card.id})" title="Billing Cycles">📅</button>` : ''}
-                    <button class="card-action-btn" onclick="event.stopPropagation(); editCard(${card.id})" title="Edit">
+                    ${card.card_type !== 'debit' ? `<button class="card-action-btn" onclick="event.stopPropagation(); showPayoffPlan(${card.id})" title="${_t('Payoff Plan')}">💰</button>` : ''}
+                    ${card.cutoff_day ? `<button class="card-action-btn" onclick="event.stopPropagation(); showBillingCycles(${card.id})" title="${_t('Billing Cycles')}">📅</button>` : ''}
+                    <button class="card-action-btn" onclick="event.stopPropagation(); editCard(${card.id})" title="${_t('Edit')}">
                         ✏️
                     </button>
-                    <button class="card-action-btn" onclick="event.stopPropagation(); deleteCard(${card.id})" title="Delete">
+                    <button class="card-action-btn" onclick="event.stopPropagation(); deleteCard(${card.id})" title="${_t('Delete')}">
                         🗑️
                     </button>
                 </div>
@@ -705,7 +719,7 @@ function renderCards(cards) {
                 <div class="card-footer">
                     <div class="card-name">${escapeHtml(card.name)}</div>
                     <div class="card-meta">
-                        ${card.cutoff_day ? `<div class="card-due">Cuts on the ${card.cutoff_day}${ordinalSuffix(card.cutoff_day)}</div>` : ''}
+                        ${card.cutoff_day ? `<div class="card-due">${_t('Cuts on the {day}', { day: dayOrdinal(card.cutoff_day) })}</div>` : ''}
                         <div class="card-currencies">
                             ${currencies.map(c => `<span class="currency-badge">${c}</span>`).join('')}
                         </div>
@@ -739,7 +753,7 @@ async function showPayoffPlan(cardId) {
             USD: data.scheduled_installments_usd.map(parseFloat),
         };
 
-        document.getElementById('payoff-modal-title').textContent = `${card.name} - Payoff Plan`;
+        document.getElementById('payoff-modal-title').textContent = `${card.name} - ${_t('Payoff Plan')}`;
         document.getElementById('payoff-delete-btn').style.display = data.plan ? '' : 'none';
 
         const plan = data.plan || {};
@@ -756,8 +770,10 @@ async function showPayoffPlan(cardId) {
             spendInput.value = num(plan[`monthly_spend_${c}`]);
             spendInput.placeholder = currentPayoffAvgSpend[currency].toFixed(2);
             document.getElementById(`payoff-spend-hint-${c}`).innerHTML =
-                `Recent average: <span class="money-value">${formatCurrency(currentPayoffAvgSpend[currency], currency)}</span>/month ` +
-                `(last ${data.avg_based_on_days} days, not counting Tasa Cero). Leave blank to use it.` +
+                _t('Recent average: {amount}/month (last {days} days, not counting Tasa Cero). Leave blank to use it.', {
+                    amount: `<span class="money-value">${formatCurrency(currentPayoffAvgSpend[currency], currency)}</span>`,
+                    days: data.avg_based_on_days,
+                }) +
                 installmentsHint(currentPayoffInstallments[currency], plan.balance_as_of, currency);
         }
 
@@ -767,7 +783,7 @@ async function showPayoffPlan(cardId) {
         document.getElementById('modal-payoff').style.display = 'block';
     } catch (error) {
         console.error('Failed to load payoff plan:', error);
-        showNotification('Failed to load payoff plan', 'error');
+        showNotification(_t('Failed to load payoff plan'), 'error');
     }
 }
 
@@ -789,10 +805,13 @@ function installmentsHint(installments, asOf, currency) {
     const total = installments.reduce((a, b) => a + b, 0);
     if (total <= 0) return '';
     const first = installments.findIndex(v => v > 0);
-    return `<br>Plus <span class="money-value">${formatCurrency(total, currency)}</span> of remaining Tasa Cero cuotas ` +
-        `(<span class="money-value">${formatCurrency(installments[first], currency)}</span> in ` +
-        `${payoffMonthLabel(asOf || formatDateForInput(new Date()), first + 1)}, last one in ` +
-        `${payoffMonthLabel(asOf || formatDateForInput(new Date()), installments.length)}).`;
+    const money = (v) => `<span class="money-value">${formatCurrency(v, currency)}</span>`;
+    return '<br>' + _t('Plus {total} of remaining Tasa Cero cuotas ({first} in {firstMonth}, last one in {lastMonth}).', {
+        total: money(total),
+        first: money(installments[first]),
+        firstMonth: payoffMonthLabel(asOf || formatDateForInput(new Date()), first + 1),
+        lastMonth: payoffMonthLabel(asOf || formatDateForInput(new Date()), installments.length),
+    });
 }
 
 /**
@@ -853,7 +872,7 @@ function paymentToClearIn(n, inputs) {
 function payoffMonthLabel(asOf, monthsAhead) {
     const d = parseDate(asOf);
     return new Date(d.getFullYear(), d.getMonth() + monthsAhead - 1, 1)
-        .toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        .toLocaleString(I18N.locale(), { month: 'long', year: 'numeric' });
 }
 
 function renderPayoffProjection() {
@@ -867,7 +886,7 @@ function renderPayoffProjection() {
 
         const cuotasLeft = inputs.installments.reduce((a, b) => a + b, 0);
         if (inputs.balance <= 0 && cuotasLeft <= 0) {
-            container.innerHTML = '<p class="field-hint">Nothing owed in this currency.</p>';
+            container.innerHTML = `<p class="field-hint">${_t('Nothing owed in this currency.')}</p>`;
             continue;
         }
 
@@ -877,26 +896,32 @@ function renderPayoffProjection() {
 
         if (result.months === null) {
             headline = `
-                <div class="payoff-headline payoff-bad">Never paid off at this rate</div>
-                <p class="payoff-detail">Each month adds ${money(firstInterest)} interest + ${money(inputs.spend)} new spending${
-                    cuotasLeft > 0 ? ` + Tasa Cero cuotas (${money(inputs.installments[0] || 0)} this month)` : ''},
-                so you need to pay more than ${money(firstInterest + inputs.spend)}${cuotasLeft > 0 ? ' plus cuotas' : ''} just for the balance to start going down.</p>
+                <div class="payoff-headline payoff-bad">${_t('Never paid off at this rate')}</div>
+                <p class="payoff-detail">${_t('Each month adds {interest} interest + {spend} new spending{cuotas}, so you need to pay more than {needed}{plusCuotas} just for the balance to start going down.', {
+                    interest: money(firstInterest),
+                    spend: money(inputs.spend),
+                    cuotas: cuotasLeft > 0 ? _t(' + Tasa Cero cuotas ({amount} this month)', { amount: money(inputs.installments[0] || 0) }) : '',
+                    needed: money(firstInterest + inputs.spend),
+                    plusCuotas: cuotasLeft > 0 ? _t(' plus cuotas') : '',
+                })}</p>
             `;
         } else {
             const months = result.months;
             const laterCuotas = inputs.installments.slice(months).reduce((a, b) => a + b, 0);
             headline = `
-                <div class="payoff-headline payoff-good">Paid off by ${payoffMonthLabel(asOf, months)}</div>
-                ${laterCuotas > 0 ? `<p class="payoff-detail">After that, only 0% Tasa Cero cuotas are left
-                    (${money(laterCuotas)} until ${payoffMonthLabel(asOf, inputs.installments.length)}) - no more interest.</p>` : ''}
-                <p class="payoff-detail">${months} payment${months === 1 ? '' : 's'} -
-                ${money(result.totalInterest)} total interest
-                ${inputs.payment > 0 ? `(${Math.round(result.totalInterest / (inputs.balance + result.totalInterest) * 100)}% of what you pay toward the debt)` : ''}.</p>
+                <div class="payoff-headline payoff-good">${_t('Paid off by {month}', { month: payoffMonthLabel(asOf, months) })}</div>
+                ${laterCuotas > 0 ? `<p class="payoff-detail">${_t('After that, only 0% Tasa Cero cuotas are left ({amount} until {month}) - no more interest.', {
+                    amount: money(laterCuotas),
+                    month: payoffMonthLabel(asOf, inputs.installments.length),
+                })}</p>` : ''}
+                <p class="payoff-detail">${_tp(months, '{n} payment', '{n} payments')} -
+                ${_t('{amount} total interest', { amount: money(result.totalInterest) })}
+                ${inputs.payment > 0 ? _t('({pct}% of what you pay toward the debt)', { pct: Math.round(result.totalInterest / (inputs.balance + result.totalInterest) * 100) }) : ''}.</p>
             `;
         }
 
         const targets = [6, 12, 24].map(n => `
-            <li>${n} months: ${money(paymentToClearIn(n, inputs))}/month</li>
+            <li>${_t('{n} months: {amount}/month', { n, amount: money(paymentToClearIn(n, inputs)) })}</li>
         `).join('');
 
         const rows = result.schedule.slice(0, 60).map(s => `
@@ -909,14 +934,18 @@ function renderPayoffProjection() {
             </tr>
         `).join('');
 
+        const keeping = inputs.spendIsAverage
+            ? (cuotasLeft > 0 ? _t('To be debt-free in (keeping your average spending, cuotas included):') : _t('To be debt-free in (keeping your average spending):'))
+            : (cuotasLeft > 0 ? _t('To be debt-free in (keeping this spending, cuotas included):') : _t('To be debt-free in (keeping this spending):'));
+
         container.innerHTML = `
             ${headline}
-            <p class="payoff-detail">To be debt-free in (keeping ${inputs.spendIsAverage ? 'your average' : 'this'} spending${cuotasLeft > 0 ? ', cuotas included' : ''}):</p>
+            <p class="payoff-detail">${keeping}</p>
             <ul class="payoff-targets">${targets}</ul>
             <details class="payoff-schedule">
-                <summary>Month-by-month</summary>
+                <summary>${_t('Month-by-month')}</summary>
                 <table>
-                    <thead><tr><th>Month</th><th>New Charges</th><th>Interest</th><th>Payment</th><th>Owed After</th></tr></thead>
+                    <thead><tr><th>${_t('Month')}</th><th>${_t('New Charges')}</th><th>${_t('Interest')}</th><th>${_t('Payment')}</th><th>${_t('Owed After')}</th></tr></thead>
                     <tbody>${rows}</tbody>
                 </table>
             </details>
@@ -940,25 +969,25 @@ async function savePayoffPlan(event) {
     try {
         await API.Cards.savePayoffPlan(currentPayoffCardId, planData);
         closeModal();
-        showNotification('Payoff plan saved', 'success');
+        showNotification(_t('Payoff plan saved'), 'success');
         if (currentView === 'budgets') await loadBudgets();
     } catch (error) {
         console.error('Failed to save payoff plan:', error);
-        showNotification(`Failed to save payoff plan: ${error.message}`, 'error');
+        showNotification(_t('Failed to save payoff plan: {error}', { error: _t(error.message) }), 'error');
     }
 }
 
 async function deletePayoffPlan() {
-    if (!confirm('Delete this payoff plan?')) return;
+    if (!confirm(_t('Delete this payoff plan?'))) return;
 
     try {
         await API.Cards.deletePayoffPlan(currentPayoffCardId);
         closeModal();
-        showNotification('Payoff plan deleted', 'success');
+        showNotification(_t('Payoff plan deleted'), 'success');
         if (currentView === 'budgets') await loadBudgets();
     } catch (error) {
         console.error('Failed to delete payoff plan:', error);
-        showNotification('Failed to delete payoff plan', 'error');
+        showNotification(_t('Failed to delete payoff plan'), 'error');
     }
 }
 
@@ -996,7 +1025,7 @@ async function loadTransactions(filters = {}, page = 0) {
         renderTransactionTotals(response.totals_by_currency || {});
     } catch (error) {
         console.error('Failed to load transactions:', error);
-        showNotification('Failed to load transactions', 'error');
+        showNotification(_t('Failed to load transactions'), 'error');
     }
 }
 
@@ -1011,7 +1040,7 @@ function renderTransactionTotals(totalsByCurrency) {
 
     container.innerHTML = currencies.map(currency => {
         const { total, count } = totalsByCurrency[currency];
-        return `<span class="transaction-totals-item"><strong class="money-value">${formatCurrency(total, currency)}</strong> across ${count} transaction${count === 1 ? '' : 's'} (${currency})</span>`;
+        return `<span class="transaction-totals-item"><strong class="money-value">${formatCurrency(total, currency)}</strong> ${_tp(count, 'across {n} transaction', 'across {n} transactions', { n: count })} (${currency})</span>`;
     }).join('');
 }
 
@@ -1022,10 +1051,10 @@ function renderTransactionPagination(total, page) {
     const end = Math.min(total, (page + 1) * TRANSACTIONS_PAGE_SIZE);
 
     container.innerHTML = `
-        <span class="page-info">Showing ${start}-${end} of ${total}</span>
-        <button ${page <= 0 ? 'disabled' : ''} onclick="loadTransactions(currentFilters, ${page - 1})">Previous</button>
-        <span class="page-info">Page ${page + 1} of ${pageCount}</span>
-        <button ${page >= pageCount - 1 ? 'disabled' : ''} onclick="loadTransactions(currentFilters, ${page + 1})">Next</button>
+        <span class="page-info">${_t('Showing {start}-{end} of {total}', { start, end, total })}</span>
+        <button ${page <= 0 ? 'disabled' : ''} onclick="loadTransactions(currentFilters, ${page - 1})">${_t('Previous')}</button>
+        <span class="page-info">${_t('Page {page} of {pages}', { page: page + 1, pages: pageCount })}</span>
+        <button ${page >= pageCount - 1 ? 'disabled' : ''} onclick="loadTransactions(currentFilters, ${page + 1})">${_t('Next')}</button>
     `;
 }
 
@@ -1033,38 +1062,38 @@ function renderTransactionsTable(transactions) {
     const container = document.getElementById('transactions-table');
 
     if (transactions.length === 0) {
-        container.innerHTML = '<p class="empty-state-text">No transactions found</p>';
+        container.innerHTML = `<p class="empty-state-text">${_t('No transactions found')}</p>`;
         return;
     }
 
     container.innerHTML = `
         <div class="transaction-table-row header">
-            <div>Date</div>
-            <div>Merchant</div>
-            <div>Category</div>
-            <div>Card</div>
-            <div>Amount</div>
-            <div>Type</div>
-            <div>Actions</div>
+            <div>${_t('Date')}</div>
+            <div>${_t('Merchant')}</div>
+            <div>${_t('Category')}</div>
+            <div>${_t('Card')}</div>
+            <div>${_t('Amount')}</div>
+            <div>${_t('Type')}</div>
+            <div>${_t('Actions')}</div>
         </div>
         ${transactions.map(t => `
             <div class="transaction-table-row">
                 <div class="transaction-date">${formatDate(t.date)}${
-                    t.date > formatDateForInput(new Date()) ? '<span class="badge badge-primary upcoming-badge">Upcoming</span>' : ''}</div>
-                <div>${escapeHtml(t.commerce_name || 'Unknown')}</div>
+                    t.date > formatDateForInput(new Date()) ? `<span class="badge badge-primary upcoming-badge">${_t('Upcoming')}</span>` : ''}</div>
+                <div>${escapeHtml(t.commerce_name || _t('Unknown'))}</div>
                 <div>
                     <select class="transaction-category-select"
                             onchange="updateTransactionCategory(${t.id}, this.value)">
-                        <option value="" ${!t.category_id ? 'selected' : ''}>Uncategorized</option>
+                        <option value="" ${!t.category_id ? 'selected' : ''}>${_t('Uncategorized')}</option>
                         ${allCategories.map(c =>
-                            `<option value="${c.id}" ${c.id === t.category_id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
+                            `<option value="${c.id}" ${c.id === t.category_id ? 'selected' : ''}>${escapeHtml(_tc(c.name))}</option>`
                         ).join('')}
                     </select>
                 </div>
                 <div>
                     <select class="transaction-card-select"
                             onchange="updateTransactionCard(${t.id}, this.value)">
-                        <option value="" ${!t.card_id ? 'selected' : ''}>No card</option>
+                        <option value="" ${!t.card_id ? 'selected' : ''}>${_t('No card')}</option>
                         ${allCards.map(c =>
                             `<option value="${c.id}" ${c.id === t.card_id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
                         ).join('')}
@@ -1075,16 +1104,16 @@ function renderTransactionsTable(transactions) {
                 </div>
                 <div>
                     <span class="badge ${getTransactionTypeBadge(t.transaction_type)}">
-                        ${escapeHtml(t.transaction_type)}
+                        ${escapeHtml(_t(t.transaction_type))}
                     </span>
                 </div>
                 <div class="transaction-actions">
                     ${!t.installment_plan_id ? `
-                        <button class="icon-btn" onclick="splitTransactionIntoInstallments(${t.id})" title="Split into installments (Tasa Cero)">
+                        <button class="icon-btn" onclick="splitTransactionIntoInstallments(${t.id})" title="${_t('Split into installments (Tasa Cero)')}">
                             📆
                         </button>
                     ` : ''}
-                    <button class="icon-btn" onclick="deleteTransaction(${t.id})" title="Delete">
+                    <button class="icon-btn" onclick="deleteTransaction(${t.id})" title="${_t('Delete')}">
                         🗑️
                     </button>
                 </div>
@@ -1098,10 +1127,10 @@ async function updateTransactionCategory(transactionId, categoryId) {
         await API.Transactions.update(transactionId, {
             category_id: categoryId || null
         });
-        showNotification('Category updated', 'success');
+        showNotification(_t('Category updated'), 'success');
     } catch (error) {
         console.error('Failed to update category:', error);
-        showNotification('Failed to update category', 'error');
+        showNotification(_t('Failed to update category'), 'error');
     }
 }
 
@@ -1110,23 +1139,23 @@ async function updateTransactionCard(transactionId, cardId) {
         await API.Transactions.update(transactionId, {
             card_id: cardId || null
         });
-        showNotification('Card updated', 'success');
+        showNotification(_t('Card updated'), 'success');
     } catch (error) {
         console.error('Failed to update card:', error);
-        showNotification('Failed to update card', 'error');
+        showNotification(_t('Failed to update card'), 'error');
     }
 }
 
 async function deleteTransaction(id) {
-    if (!confirm('Are you sure you want to delete this transaction?')) return;
+    if (!confirm(_t('Are you sure you want to delete this transaction?'))) return;
 
     try {
         await API.Transactions.delete(id);
-        showNotification('Transaction deleted', 'success');
+        showNotification(_t('Transaction deleted'), 'success');
         await loadTransactions(currentFilters, currentPage);
     } catch (error) {
         console.error('Failed to delete transaction:', error);
-        showNotification('Failed to delete transaction', 'error');
+        showNotification(_t('Failed to delete transaction'), 'error');
     }
 }
 
@@ -1138,13 +1167,13 @@ function showFilters() {
 function populateTransactionFilterOptions() {
     const categorySelect = document.getElementById('filter-category');
     const previousCategory = categorySelect.value;
-    categorySelect.innerHTML = '<option value="">All</option>' +
-        allCategories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    categorySelect.innerHTML = `<option value="">${_t('All')}</option>` +
+        allCategories.map(c => `<option value="${c.id}">${escapeHtml(_tc(c.name))}</option>`).join('');
     categorySelect.value = previousCategory;
 
     const cardSelect = document.getElementById('filter-card');
     const previousCard = cardSelect.value;
-    cardSelect.innerHTML = '<option value="">All</option>' +
+    cardSelect.innerHTML = `<option value="">${_t('All')}</option>` +
         allCards.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
     cardSelect.value = previousCard;
 }
@@ -1179,6 +1208,26 @@ function clearFilters() {
 let currentAnalyticsFilters = {};
 let cachedOldestTransactionDate = null;
 
+// ApexCharts ships only English UI strings in the main bundle (toolbar menu, tooltips),
+// so the Spanish ones are supplied here.
+const APEX_ES_LOCALE = {
+    name: 'es',
+    options: {
+        toolbar: {
+            exportToSVG: 'Descargar SVG',
+            exportToPNG: 'Descargar PNG',
+            exportToCSV: 'Descargar CSV',
+            menu: 'Menú',
+            selection: 'Selección',
+            selectionZoom: 'Selección y zoom',
+            zoomIn: 'Acercar',
+            zoomOut: 'Alejar',
+            pan: 'Desplazar',
+            reset: 'Restablecer zoom',
+        },
+    },
+};
+
 function renderChart(containerId, options) {
     // Charts don't replace themselves on repeat renders by default, so
     // without clearing the container first, switching tabs/filters stacks
@@ -1187,10 +1236,13 @@ function renderChart(containerId, options) {
     el.innerHTML = '';
 
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    // English is ApexCharts' built-in locale; passing a `locales` list replaces the built-ins,
+    // so the custom list is only supplied when it is actually needed.
+    const localeOptions = I18N.lang() === 'es' ? { locales: [APEX_ES_LOCALE], defaultLocale: 'es' } : {};
     const themedOptions = {
         ...options,
         theme: { mode: isDark ? 'dark' : 'light', ...(options.theme || {}) },
-        chart: { background: 'transparent', ...(options.chart || {}) },
+        chart: { background: 'transparent', ...localeOptions, ...(options.chart || {}) },
     };
 
     const chart = new ApexCharts(el, themedOptions);
@@ -1203,73 +1255,73 @@ async function loadMonthForecast() {
     } catch (error) {
         console.error('Failed to load forecast:', error);
         document.getElementById('forecast-lines').innerHTML =
-            '<p class="empty-state-text">Failed to load the forecast</p>';
+            `<p class="empty-state-text">${_t('Failed to load the forecast')}</p>`;
     }
 }
 
 function renderMonthForecast(f) {
     // Forecasts are estimates - whole colones, no false precision.
-    const crc = (v) => `<span class="money-value">${v < 0 ? '-' : ''}₡${Math.round(Math.abs(v)).toLocaleString('en-US')}</span>`;
+    const crc = (v) => `<span class="money-value">${v < 0 ? '-' : ''}₡${Math.round(Math.abs(v)).toLocaleString(I18N.locale())}</span>`;
     const num = parseFloat;
     const monthLabel = (ym, opts = { month: 'long' }) => {
         const [y, m] = ym.split('-').map(Number);
-        return new Date(y, m - 1, 1).toLocaleString('en-US', opts);
+        return new Date(y, m - 1, 1).toLocaleString(I18N.locale(), opts);
     };
     const monthName = monthLabel(f.month);
     const left = num(f.projected_left);
     const debt = num(f.total_debt);
 
     // Usual-month range, e.g. "Aug–Sep".
-    let usual = 'your usual month';
+    let usual = _t('your usual month');
     if (f.history_months > 0) {
         const [y, m] = f.month.split('-').map(Number);
         const last = `${new Date(y, m - 2, 1).getFullYear()}-${String(new Date(y, m - 2, 1).getMonth() + 1).padStart(2, '0')}`;
         const short = { month: 'short' };
         usual = f.history_months === 1
-            ? `your usual month (${monthLabel(f.history_start, short)})`
-            : `your usual month (${monthLabel(f.history_start, short)}–${monthLabel(last, short)} average)`;
+            ? _t('your usual month ({month})', { month: monthLabel(f.history_start, short) })
+            : _t('your usual month ({from}–{to} average)', { from: monthLabel(f.history_start, short), to: monthLabel(last, short) });
     }
 
     document.getElementById('forecast-caption').textContent = `(${monthName})`;
 
     const leftEl = document.getElementById('forecast-left');
-    leftEl.innerHTML = left < 0 ? `${crc(-left)} short` : `${crc(left)} left`;
+    leftEl.innerHTML = left < 0 ? _t('{amount} short', { amount: crc(-left) }) : _t('{amount} left', { amount: crc(left) });
     leftEl.classList.toggle('budget-over', left < 0);
     document.getElementById('forecast-sentence').innerHTML = left < 0
-        ? `If the rest of ${monthName} goes like ${f.history_months ? 'your usual month' : 'it has so far'}, you'll spend <strong>${crc(-left)} more than you earn</strong>.`
-        : `If the rest of ${monthName} goes like ${f.history_months ? 'your usual month' : 'it has so far'}, you'll end with <strong>${crc(left)} to spare</strong>.`;
+        ? _t("If the rest of {month} goes like {pace}, you'll spend <strong>{amount} more than you earn</strong>.", { month: monthName, pace: f.history_months ? _t('your usual month') : _t('it has so far'), amount: crc(-left) })
+        : _t("If the rest of {month} goes like {pace}, you'll end with <strong>{amount} to spare</strong>.", { month: monthName, pace: f.history_months ? _t('your usual month') : _t('it has so far'), amount: crc(left) });
     document.getElementById('forecast-equation').innerHTML = `
-        <div class="budget-eq-row"><span>Expected income</span>${crc(num(f.income_base))}</div>
-        <div class="budget-eq-row"><span>− Likely spending</span>${crc(num(f.projected_spend))}</div>
-        ${debt > 0 ? `<div class="budget-eq-row"><span>− Card debt payment</span>${crc(debt)}</div>` : ''}
-        <div class="budget-eq-row budget-eq-total"><span>= ${left < 0 ? 'Short' : 'Left'} at month end</span>${crc(left)}</div>
+        <div class="budget-eq-row"><span>${_t('Expected income')}</span>${crc(num(f.income_base))}</div>
+        <div class="budget-eq-row"><span>− ${_t('Likely spending')}</span>${crc(num(f.projected_spend))}</div>
+        ${debt > 0 ? `<div class="budget-eq-row"><span>− ${_t('Card debt payment')}</span>${crc(debt)}</div>` : ''}
+        <div class="budget-eq-row budget-eq-total"><span>${left < 0 ? _t('= Short at month end') : _t('= Left at month end')}</span>${crc(left)}</div>
     `;
 
     // How much to trust it: pace share grows with the month.
     const pacePct = Math.round(num(f.pace_weight) * 100);
     document.getElementById('forecast-confidence').innerHTML = f.history_months > 0 ? `
         <div class="forecast-confidence-text">
-            <strong>Day ${f.days_elapsed} of ${f.days_in_month}.</strong>
-            This forecast is <strong>${100 - pacePct}% based on ${usual}</strong> and ${pacePct}% on how you've spent so far in ${monthName}.
-            ${pacePct < 40 ? `It's early, so treat it as "what happens if this month looks like the last ones" - it gets more accurate as ${monthName} goes on.` : `It's leaning on this month's real spending now, so it should be fairly close.`}
+            <strong>${_t('Day {day} of {days}.', { day: f.days_elapsed, days: f.days_in_month })}</strong>
+            ${_t("This forecast is <strong>{usualPct}% based on {usual}</strong> and {pacePct}% on how you've spent so far in {month}.", { usualPct: 100 - pacePct, usual, pacePct, month: monthName })}
+            ${pacePct < 40 ? _t(`It's early, so treat it as "what happens if this month looks like the last ones" - it gets more accurate as {month} goes on.`, { month: monthName }) : _t("It's leaning on this month's real spending now, so it should be fairly close.")}
         </div>
-        <div class="forecast-confidence-bar" title="${100 - pacePct}% usual month, ${pacePct}% this month's pace">
+        <div class="forecast-confidence-bar" title="${_t("{usualPct}% usual month, {pacePct}% this month's pace", { usualPct: 100 - pacePct, pacePct })}">
             <span class="forecast-conf-usual" style="width: ${100 - pacePct}%"></span>
             <span class="forecast-conf-pace" style="width: ${pacePct}%"></span>
         </div>
-        <div class="forecast-confidence-labels"><span>Your usual month</span><span>This month's pace</span></div>
-    ` : `<div class="forecast-confidence-text"><strong>Day ${f.days_elapsed} of ${f.days_in_month}.</strong> There's no full past month to compare with yet, so this is based only on how you've spent so far in ${monthName}.</div>`;
+        <div class="forecast-confidence-labels"><span>${_t('Your usual month')}</span><span>${_t("This month's pace")}</span></div>
+    ` : `<div class="forecast-confidence-text"><strong>${_t('Day {day} of {days}.', { day: f.days_elapsed, days: f.days_in_month })}</strong> ${_t("There's no full past month to compare with yet, so this is based only on how you've spent so far in {month}.", { month: monthName })}</div>`;
 
     const statusText = (l) => {
         const projected = num(l.projected);
         const budget = l.budget === null ? null : num(l.budget);
         switch (l.status) {
-            case 'over': return `<span class="forecast-status status-over">⛔ Already ${crc(num(l.spent_so_far) - budget)} over budget</span>`;
-            case 'at_risk': return `<span class="forecast-status status-risk">⚠ Likely to go ${crc(projected - budget)} over</span>`;
+            case 'over': return `<span class="forecast-status status-over">${_t('⛔ Already {amount} over budget', { amount: crc(num(l.spent_so_far) - budget) })}</span>`;
+            case 'at_risk': return `<span class="forecast-status status-risk">${_t('⚠ Likely to go {amount} over', { amount: crc(projected - budget) })}</span>`;
             case 'on_track': return budget - projected < Math.max(1000, budget * 0.01)
-                ? '<span class="forecast-status status-ok">✓ Right at budget</span>'
-                : `<span class="forecast-status status-ok">✓ On track, about ${crc(budget - projected)} to spare</span>`;
-            default: return '<span class="forecast-status status-none">No budget set</span>';
+                ? `<span class="forecast-status status-ok">${_t('✓ Right at budget')}</span>`
+                : `<span class="forecast-status status-ok">${_t('✓ On track, about {amount} to spare', { amount: crc(budget - projected) })}</span>`;
+            default: return `<span class="forecast-status status-none">${_t('No budget set')}</span>`;
         }
     };
 
@@ -1284,25 +1336,25 @@ function renderMonthForecast(f) {
 
         let restHow;
         if (l.basis === 'history') {
-            restHow = `You usually spend ${crc(typical)} here in a month and few, larger purchases (like bills) make the daily pace meaningless, so it's your usual month minus what you've already spent.`;
+            restHow = _t("You usually spend {typical} here in a month and few, larger purchases (like bills) make the daily pace meaningless, so it's your usual month minus what you've already spent.", { typical: crc(typical) });
         } else if (l.basis === 'pace') {
-            restHow = `No past month to compare with, so it's this month's pace: ${crc(num(l.pace_month))} a month at the rate you're going.`;
+            restHow = _t("No past month to compare with, so it's this month's pace: {pace} a month at the rate you're going.", { pace: crc(num(l.pace_month)) });
         } else {
-            restHow = `A mix of two guesses:
+            restHow = `${_t('A mix of two guesses:')}
                 <ul>
-                    <li><strong>Your usual month:</strong> you typically spend ${crc(typical)} → ${crc(num(l.rest_from_typical))} still to go <span class="forecast-weight">(counts ${100 - w}%)</span></li>
-                    <li><strong>This month's pace:</strong> at your current rate it'd be ${crc(num(l.pace_month))} for the month → ${crc(num(l.rest_from_pace))} still to go <span class="forecast-weight">(counts ${w}%)</span></li>
+                    <li>${_t('<strong>Your usual month:</strong> you typically spend {typical} → {rest} still to go <span class="forecast-weight">(counts {pct}%)</span>', { typical: crc(typical), rest: crc(num(l.rest_from_typical)), pct: 100 - w })}</li>
+                    <li>${_t(`<strong>This month's pace:</strong> at your current rate it'd be {pace} for the month → {rest} still to go <span class="forecast-weight">(counts {pct}%)</span>`, { pace: crc(num(l.pace_month)), rest: crc(num(l.rest_from_pace)), pct: w })}</li>
                 </ul>`;
         }
 
         return `
             <div class="forecast-explain">
-                <div class="budget-eq-row"><span>Spent so far</span>${crc(spent)}</div>
-                <div class="budget-eq-row"><span>+ Expected rest of month</span>${crc(rest)}</div>
+                <div class="budget-eq-row"><span>${_t('Spent so far')}</span>${crc(spent)}</div>
+                <div class="budget-eq-row"><span>+ ${_t('Expected rest of month')}</span>${crc(rest)}</div>
                 <div class="forecast-explain-how">${restHow}</div>
-                ${scheduled > 0 ? `<div class="budget-eq-row"><span>+ Tasa Cero cuotas still to be charged</span>${crc(scheduled)}</div>` : ''}
-                <div class="budget-eq-row budget-eq-total"><span>= Likely total</span>${crc(projected)}</div>
-                ${budget !== null ? `<div class="budget-eq-row"><span>Budget (after card debt)</span>${crc(budget)}</div>` : ''}
+                ${scheduled > 0 ? `<div class="budget-eq-row"><span>+ ${_t('Tasa Cero cuotas still to be charged')}</span>${crc(scheduled)}</div>` : ''}
+                <div class="budget-eq-row budget-eq-total"><span>= ${_t('Likely total')}</span>${crc(projected)}</div>
+                ${budget !== null ? `<div class="budget-eq-row"><span>${_t('Budget (after card debt)')}</span>${crc(budget)}</div>` : ''}
             </div>
         `;
     };
@@ -1315,9 +1367,9 @@ function renderMonthForecast(f) {
         const budget = l.budget === null ? null : num(l.budget);
         const scale = Math.max(projected, budget || 0) * 1.08 || 1;
         const segments = [
-            { cls: 'forecast-spent', value: spent, title: `Spent so far: ₡${Math.round(spent).toLocaleString('en-US')}` },
-            { cls: 'forecast-rest', value: rest, title: `Expected rest of month: ₡${Math.round(rest).toLocaleString('en-US')}` },
-            { cls: 'forecast-cuotas', value: scheduled, title: `Tasa Cero cuotas still to be charged: ₡${Math.round(scheduled).toLocaleString('en-US')}` },
+            { cls: 'forecast-spent', value: spent, title: _t('Spent so far: {amount}', { amount: `₡${Math.round(spent).toLocaleString(I18N.locale())}` }) },
+            { cls: 'forecast-rest', value: rest, title: _t('Expected rest of month: {amount}', { amount: `₡${Math.round(rest).toLocaleString(I18N.locale())}` }) },
+            { cls: 'forecast-cuotas', value: scheduled, title: _t('Tasa Cero cuotas still to be charged: {amount}', { amount: `₡${Math.round(scheduled).toLocaleString(I18N.locale())}` }) },
         ].filter(seg => seg.value > 0);
         return `
             <details class="forecast-line">
@@ -1325,14 +1377,14 @@ function renderMonthForecast(f) {
                     <span class="budget-category">
                         <span class="forecast-chevron">▸</span>
                         <span class="category-icon">${escapeHtml(l.category_icon || '')}</span>
-                        ${escapeHtml(l.category_name)}
+                        ${escapeHtml(_tc(l.category_name))}
                     </span>
                     <span class="forecast-bar">
                         ${segments.map(seg => `<span class="${seg.cls}" style="width: ${seg.value / scale * 100}%" title="${seg.title}"></span>`).join('')}
-                        ${budget !== null ? `<span class="forecast-tick" style="left: ${budget / scale * 100}%" title="Budget: ₡${Math.round(budget).toLocaleString('en-US')}"></span>` : ''}
+                        ${budget !== null ? `<span class="forecast-tick" style="left: ${budget / scale * 100}%" title="${_t('Budget: {amount}', { amount: `₡${Math.round(budget).toLocaleString(I18N.locale())}` })}"></span>` : ''}
                     </span>
                     <span class="forecast-numbers">
-                        <span>Likely ${crc(projected)}${budget !== null ? ` of ${crc(budget)} budget` : ''}</span>
+                        <span>${_t('Likely {amount}', { amount: crc(projected) })}${budget !== null ? _t(' of {amount} budget', { amount: crc(budget) }) : ''}</span>
                         ${statusText(l)}
                     </span>
                 </summary>
@@ -1342,10 +1394,10 @@ function renderMonthForecast(f) {
     };
 
     const groups = [
-        { title: '⚠ Needs attention', lines: f.lines.filter(l => l.status === 'over' || l.status === 'at_risk') },
-        { title: '✓ On track', lines: f.lines.filter(l => l.status === 'on_track') },
-        { title: 'No budget', lines: f.lines.filter(l => l.status === 'no_budget'),
-          hint: 'Not in any budget, but still counted in your likely spending above.' },
+        { title: _t('⚠ Needs attention'), lines: f.lines.filter(l => l.status === 'over' || l.status === 'at_risk') },
+        { title: _t('✓ On track'), lines: f.lines.filter(l => l.status === 'on_track') },
+        { title: _t('No budget'), lines: f.lines.filter(l => l.status === 'no_budget'),
+          hint: _t('Not in any budget, but still counted in your likely spending above.') },
     ].filter(g => g.lines.length > 0);
 
     document.getElementById('forecast-lines').innerHTML = groups.map(g => `
@@ -1391,7 +1443,7 @@ async function loadAnalytics(filters = {}) {
         renderCardUtilizationChart(cardData);
     } catch (error) {
         console.error('Failed to load analytics:', error);
-        showNotification('Failed to load analytics', 'error');
+        showNotification(_t('Failed to load analytics'), 'error');
     }
 }
 
@@ -1444,7 +1496,7 @@ async function setAnalyticsPreset(preset) {
 
 function renderCategoryPieChart(data, containerId, currency) {
     if (data.length === 0) {
-        document.querySelector(containerId).innerHTML = `<p class="empty-state-text">No ${currency} spending in this range</p>`;
+        document.querySelector(containerId).innerHTML = `<p class="empty-state-text">${_t('No {currency} spending in this range', { currency })}</p>`;
         return;
     }
 
@@ -1459,7 +1511,7 @@ function renderCategoryPieChart(data, containerId, currency) {
             type: 'donut',
             height: 320
         },
-        labels: data.map(d => d.category_name),
+        labels: data.map(d => _tc(d.category_name)),
         colors: data.map(d => d.category_color || '#6B7280'),
         stroke: {
             colors: [cardBg]
@@ -1496,8 +1548,8 @@ function renderDailySpendingChart(dailyCrc, dailyUsd) {
             labels: { rotate: -45 }
         },
         yaxis: [
-            { title: { text: 'CRC' }, labels: { formatter: (v) => v.toLocaleString() } },
-            { opposite: true, title: { text: 'USD' }, labels: { formatter: (v) => v.toLocaleString() } },
+            { title: { text: 'CRC' }, labels: { formatter: (v) => v.toLocaleString(I18N.locale()) } },
+            { opposite: true, title: { text: 'USD' }, labels: { formatter: (v) => v.toLocaleString(I18N.locale()) } },
         ],
         stroke: {
             curve: 'smooth'
@@ -1535,13 +1587,13 @@ function renderMonthlyTrendsChart(data) {
 
 function renderTopMerchantsChart(data, containerId, currency) {
     if (data.length === 0) {
-        document.querySelector(containerId).innerHTML = `<p class="empty-state-text">No ${currency} spending in this range</p>`;
+        document.querySelector(containerId).innerHTML = `<p class="empty-state-text">${_t('No {currency} spending in this range', { currency })}</p>`;
         return;
     }
 
     renderChart(containerId, {
         series: [{
-            name: `Spent (${currency})`,
+            name: _t('Spent ({currency})', { currency }),
             data: data.map(d => parseFloat(d.total_amount))
         }],
         chart: {
@@ -1563,8 +1615,8 @@ function renderTopMerchantsChart(data, containerId, currency) {
 function renderCardUtilizationChart(data) {
     renderChart("#chart-card-utilization", {
         series: [
-            { name: 'Spent (CRC)', data: data.map(d => parseFloat(d.spent_crc)) },
-            { name: 'Spent (USD)', data: data.map(d => parseFloat(d.spent_usd)) }
+            { name: _t('Spent (CRC)'), data: data.map(d => parseFloat(d.spent_crc)) },
+            { name: _t('Spent (USD)'), data: data.map(d => parseFloat(d.spent_usd)) }
         ],
         chart: {
             type: 'bar',
@@ -1587,7 +1639,7 @@ function renderCardUtilizationChart(data) {
         },
         yaxis: {
             labels: {
-                formatter: (val) => val.toLocaleString()
+                formatter: (val) => val.toLocaleString(I18N.locale())
             }
         },
         colors: ['#4F46E5', '#10B981']
@@ -1605,7 +1657,7 @@ async function loadCategories() {
         renderCategories(categories);
     } catch (error) {
         console.error('Failed to load categories:', error);
-        showNotification('Failed to load categories', 'error');
+        showNotification(_t('Failed to load categories'), 'error');
     }
 }
 
@@ -1613,7 +1665,7 @@ function renderCategories(categories) {
     const container = document.getElementById('categories-list');
 
     if (categories.length === 0) {
-        container.innerHTML = '<p class="empty-state-text">No categories yet</p>';
+        container.innerHTML = `<p class="empty-state-text">${_t('No categories yet')}</p>`;
         return;
     }
 
@@ -1622,11 +1674,11 @@ function renderCategories(categories) {
             <div class="category-info">
                 <div class="category-color-dot" style="background-color: ${cat.color}"></div>
                 <div class="category-icon">${cat.icon}</div>
-                <div class="category-name">${escapeHtml(cat.name)}</div>
+                <div class="category-name">${escapeHtml(_tc(cat.name))}</div>
             </div>
             <div class="category-actions">
-                <button class="icon-btn" onclick="editCategory(${cat.id})" title="Edit">✏️</button>
-                <button class="icon-btn" onclick="deleteCategory(${cat.id})" title="Delete">🗑️</button>
+                <button class="icon-btn" onclick="editCategory(${cat.id})" title="${_t('Edit')}">✏️</button>
+                <button class="icon-btn" onclick="deleteCategory(${cat.id})" title="${_t('Delete')}">🗑️</button>
             </div>
         </div>
     `).join('');
@@ -1649,7 +1701,7 @@ async function loadSettings() {
         renderCredentialsStatus(credStatus);
     } catch (error) {
         console.error('Failed to load settings:', error);
-        showNotification('Failed to load settings', 'error');
+        showNotification(_t('Failed to load settings'), 'error');
     }
 }
 
@@ -1657,7 +1709,7 @@ function renderEmailSources(sources) {
     const container = document.getElementById('email-sources-list');
 
     if (sources.length === 0) {
-        container.innerHTML = '<p class="empty-state-text">No email sources configured</p>';
+        container.innerHTML = `<p class="empty-state-text">${_t('No email sources configured')}</p>`;
         return;
     }
 
@@ -1670,17 +1722,17 @@ function renderEmailSources(sources) {
 }
 
 function renderSyncStatus(status) {
-    const lastSync = status.last_sync ? formatDate(status.last_sync, true) : 'Never';
-    document.getElementById('last-sync-time').textContent = `Last sync: ${lastSync}`;
+    const lastSync = status.last_sync ? formatDate(status.last_sync, true) : _t('Never');
+    document.getElementById('last-sync-time').textContent = _t('Last sync: {when}', { when: lastSync });
 }
 
 function reportSyncResult(result) {
     if (!result.success) {
-        showNotification((result.errors && result.errors[0]) || result.message, 'error');
+        showNotification(_t((result.errors && result.errors[0]) || result.message), 'error');
         return;
     }
     showNotification(
-        `${result.new_transactions} new, ${result.skipped_duplicates} already had it, from ${result.sources_synced} source(s)`,
+        _t('{new} new, {skipped} already had it, from {sources} source(s)', { new: result.new_transactions, skipped: result.skipped_duplicates, sources: result.sources_synced }),
         'success'
     );
 }
@@ -1689,9 +1741,9 @@ async function triggerSync() {
     const btn = document.getElementById('btn-sync-now');
     const originalLabel = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Syncing...';
+    setLabel(btn, _t('Syncing...'));
     try {
-        showNotification('Sync started - this can take a minute...', 'info');
+        showNotification(_t('Sync started - this can take a minute...'), 'info');
         const result = await API.Sync.triggerSync();
         reportSyncResult(result);
         await loadSettings();
@@ -1700,10 +1752,10 @@ async function triggerSync() {
         }
     } catch (error) {
         console.error('Sync failed:', error);
-        showNotification('Sync failed: ' + error.message, 'error');
+        showNotification(_t('Sync failed: {error}', { error: _t(error.message) }), 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = originalLabel;
+        setLabel(btn, originalLabel);
     }
 }
 
@@ -1711,16 +1763,16 @@ async function triggerSyncRange() {
     const startDate = document.getElementById('sync-range-start').value;
     const endDate = document.getElementById('sync-range-end').value;
     if (!startDate || !endDate) {
-        showNotification('Pick a start and end date first', 'error');
+        showNotification(_t('Pick a start and end date first'), 'error');
         return;
     }
 
     const btn = document.getElementById('btn-sync-range');
     const originalLabel = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Syncing...';
+    setLabel(btn, _t('Syncing...'));
     try {
-        showNotification('Sync started - this can take a minute...', 'info');
+        showNotification(_t('Sync started - this can take a minute...'), 'info');
         const result = await API.Sync.triggerSyncRange(startDate, endDate);
         reportSyncResult(result);
         await loadSettings();
@@ -1729,10 +1781,10 @@ async function triggerSyncRange() {
         }
     } catch (error) {
         console.error('Sync failed:', error);
-        showNotification('Sync failed: ' + error.message, 'error');
+        showNotification(_t('Sync failed: {error}', { error: _t(error.message) }), 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = originalLabel;
+        setLabel(btn, originalLabel);
     }
 }
 
@@ -1740,19 +1792,19 @@ async function triggerRecategorize() {
     const btn = document.getElementById('btn-recategorize');
     const originalLabel = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Working...';
+    setLabel(btn, _t('Working...'));
     try {
         const result = await API.Maintenance.recategorize();
-        showNotification(`Checked ${result.checked}, recategorized ${result.updated}`, 'success');
+        showNotification(_t('Checked {checked}, recategorized {updated}', { checked: result.checked, updated: result.updated }), 'success');
         if (currentView !== 'settings') {
             await showView(currentView);
         }
     } catch (error) {
         console.error('Recategorize failed:', error);
-        showNotification('Failed: ' + error.message, 'error');
+        showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = originalLabel;
+        setLabel(btn, originalLabel);
     }
 }
 
@@ -1760,13 +1812,13 @@ function renderCredentialsStatus(status) {
     const el = document.getElementById('credentials-status');
     if (!el) return;
     if (!status) {
-        el.textContent = 'Could not check the credentials file.';
+        el.textContent = _t('Could not check the credentials file.');
     } else if (!status.has_credentials) {
-        el.textContent = '✗ No Google file yet - upload it below to connect Gmail.';
+        el.textContent = _t('✗ No Google file yet - upload it below to connect Gmail.');
     } else if (!status.has_token) {
-        el.textContent = '✓ Google file in place. Click "Sync Now" to log in to Gmail.';
+        el.textContent = _t('✓ Google file in place. Click "Sync Now" to log in to Gmail.');
     } else {
-        el.textContent = '✓ Google file in place and Gmail connected.';
+        el.textContent = _t('✓ Google file in place and Gmail connected.');
     }
 }
 
@@ -1777,14 +1829,14 @@ async function handleCredentialsFile(file) {
         const result = await API.Credentials.upload(content);
         showNotification(
             result.token_removed
-                ? 'Credentials replaced - click "Sync Now" to log in again'
-                : 'Credentials saved - click "Sync Now" to log in to Gmail',
+                ? _t('Credentials replaced - click "Sync Now" to log in again')
+                : _t('Credentials saved - click "Sync Now" to log in to Gmail'),
             'success'
         );
         renderCredentialsStatus(await API.Credentials.getStatus());
     } catch (error) {
         console.error('Credentials upload failed:', error);
-        showNotification(error.message, 'error');
+        showNotification(_t(error.message), 'error');
     } finally {
         const input = document.getElementById('credentials-file');
         if (input) input.value = '';
@@ -1801,16 +1853,16 @@ async function triggerReconnectGmail() {
     const btn = document.getElementById('btn-reconnect-gmail');
     const originalLabel = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Working...';
+    setLabel(btn, _t('Working...'));
     try {
         await API.Maintenance.reconnectGmail();
-        showNotification('Done - click "Sync Now" to log in to Gmail again', 'success');
+        showNotification(_t('Done - click "Sync Now" to log in to Gmail again'), 'success');
     } catch (error) {
         console.error('Reconnect failed:', error);
-        showNotification('Failed: ' + error.message, 'error');
+        showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = originalLabel;
+        setLabel(btn, originalLabel);
     }
 }
 
@@ -1834,7 +1886,7 @@ function closeModal() {
 
 function showAddCardModal() {
     currentCard = null;
-    document.getElementById('card-modal-title').textContent = 'Add Card';
+    document.getElementById('card-modal-title').textContent = _t('Add Card');
     document.getElementById('card-form').reset();
     document.getElementById('card-id').value = '';
     document.getElementById('card-color').value = '#4F46E5';
@@ -1848,12 +1900,12 @@ function showAddCardModal() {
 
 function populateCardCategoryDropdown() {
     const select = document.getElementById('card-default-category');
-    select.innerHTML = '<option value="">None</option>';
+    select.innerHTML = `<option value="">${_t('None')}</option>`;
 
     allCategories.forEach(cat => {
         const option = document.createElement('option');
         option.value = cat.id;
-        option.textContent = `${cat.icon} ${cat.name}`;
+        option.textContent = `${cat.icon} ${_tc(cat.name)}`;
         select.appendChild(option);
     });
 }
@@ -1863,7 +1915,7 @@ async function editCard(id) {
         const card = await API.Cards.getById(id);
         currentCard = card;
 
-        document.getElementById('card-modal-title').textContent = 'Edit Card';
+        document.getElementById('card-modal-title').textContent = _t('Edit Card');
         document.getElementById('card-id').value = card.id;
         document.getElementById('card-name').value = card.name;
         document.getElementById('card-last-four').value = card.last_four || '';
@@ -1882,7 +1934,7 @@ async function editCard(id) {
         document.getElementById('modal-card').style.display = 'block';
     } catch (error) {
         console.error('Failed to load card:', error);
-        showNotification('Failed to load card', 'error');
+        showNotification(_t('Failed to load card'), 'error');
     }
 }
 
@@ -1910,30 +1962,30 @@ async function saveCard(event) {
 
         if (cardId) {
             await API.Cards.update(parseInt(cardId), cardData);
-            showNotification('Card updated', 'success');
+            showNotification(_t('Card updated'), 'success');
         } else {
             await API.Cards.create(cardData);
-            showNotification('Card created', 'success');
+            showNotification(_t('Card created'), 'success');
         }
 
         closeModal();
         await loadCards();
     } catch (error) {
         console.error('Failed to save card:', error);
-        showNotification('Failed to save card', 'error');
+        showNotification(_t('Failed to save card'), 'error');
     }
 }
 
 async function deleteCard(id) {
-    if (!confirm('Are you sure you want to delete this card?')) return;
+    if (!confirm(_t('Are you sure you want to delete this card?'))) return;
 
     try {
         await API.Cards.delete(id);
-        showNotification('Card deleted', 'success');
+        showNotification(_t('Card deleted'), 'success');
         await loadCards();
     } catch (error) {
         console.error('Failed to delete card:', error);
-        showNotification('Failed to delete card', 'error');
+        showNotification(_t('Failed to delete card'), 'error');
     }
 }
 
@@ -1946,14 +1998,14 @@ async function showBillingCycles(cardId) {
         const card = allCards.find(c => c.id === cardId) || await API.Cards.getById(cardId);
         const cycles = await API.Cards.getBillingCycles(cardId);
 
-        document.getElementById('billing-cycles-title').textContent = `${card.name} - Billing Cycles`;
+        document.getElementById('billing-cycles-title').textContent = `${card.name} - ${_t('Billing Cycles')}`;
         renderBillingCycles(cycles);
 
         document.getElementById('modal-overlay').style.display = 'block';
         document.getElementById('modal-billing-cycles').style.display = 'block';
     } catch (error) {
         console.error('Failed to load billing cycles:', error);
-        showNotification('Failed to load billing cycles', 'error');
+        showNotification(_t('Failed to load billing cycles'), 'error');
     }
 }
 
@@ -1961,7 +2013,7 @@ function renderBillingCycles(cycles) {
     const container = document.getElementById('billing-cycles-list');
 
     if (cycles.length === 0) {
-        container.innerHTML = '<p class="empty-state-text">No cycles yet</p>';
+        container.innerHTML = `<p class="empty-state-text">${_t('No cycles yet')}</p>`;
         return;
     }
 
@@ -1969,13 +2021,13 @@ function renderBillingCycles(cycles) {
         <div class="billing-cycle-item ${c.is_current ? 'current' : ''}">
             <div class="billing-cycle-dates">
                 <strong>${formatDate(c.cycle_start)} - ${formatDate(c.cycle_end)}</strong>
-                ${c.is_current ? '<span class="badge badge-primary">Current</span>' : ''}
+                ${c.is_current ? `<span class="badge badge-primary">${_t('Current')}</span>` : ''}
             </div>
-            <div class="billing-cycle-due">Due ${formatDate(c.due_date)}</div>
+            <div class="billing-cycle-due">${_t('Due {date}', { date: formatDate(c.due_date) })}</div>
             <div class="billing-cycle-totals">
                 ${parseFloat(c.total_crc) > 0 ? `<span>${formatCurrency(c.total_crc, 'CRC')}</span>` : ''}
                 ${parseFloat(c.total_usd) > 0 ? `<span>${formatCurrency(c.total_usd, 'USD')}</span>` : ''}
-                <span class="billing-cycle-count">${c.transaction_count} txn${c.transaction_count === 1 ? '' : 's'}</span>
+                <span class="billing-cycle-count">${_tp(c.transaction_count, '{n} txn', '{n} txns')}</span>
             </div>
         </div>
     `).join('');
@@ -1999,15 +2051,15 @@ function showInstallmentPlanModal(prefill = null) {
     cardSelect.innerHTML = allCards.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 
     const categorySelect = document.getElementById('plan-category');
-    categorySelect.innerHTML = '<option value="">Uncategorized</option>' +
-        allCategories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    categorySelect.innerHTML = `<option value="">${_t('Uncategorized')}</option>` +
+        allCategories.map(c => `<option value="${c.id}">${escapeHtml(_tc(c.name))}</option>`).join('');
 
     const modalTitle = document.querySelector('#modal-installment-plan .modal-header h3');
     const submitBtn = document.querySelector('#installment-plan-form button[type="submit"]');
 
     if (prefill) {
-        modalTitle.textContent = 'Split Into Installments';
-        submitBtn.textContent = 'Split Transaction';
+        modalTitle.textContent = _t('Split Into Installments');
+        submitBtn.textContent = _t('Split Transaction');
         document.getElementById('plan-description').value = prefill.commerce_name || '';
         document.getElementById('plan-total-amount').value = prefill.amount;
         document.getElementById('plan-currency').value = prefill.currency;
@@ -2015,8 +2067,8 @@ function showInstallmentPlanModal(prefill = null) {
         if (prefill.card_id) cardSelect.value = prefill.card_id;
         if (prefill.category_id) categorySelect.value = prefill.category_id;
     } else {
-        modalTitle.textContent = 'Tasa Cero (Installment Plan)';
-        submitBtn.textContent = 'Create Plan';
+        modalTitle.textContent = _t('Tasa Cero (Installment Plan)');
+        submitBtn.textContent = _t('Create Plan');
         const now = new Date();
         document.getElementById('plan-first-month').value =
             `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -2034,7 +2086,7 @@ async function splitTransactionIntoInstallments(transactionId) {
         showInstallmentPlanModal(transaction);
     } catch (error) {
         console.error('Failed to load transaction:', error);
-        showNotification('Failed to load transaction', 'error');
+        showNotification(_t('Failed to load transaction'), 'error');
     }
 }
 
@@ -2051,7 +2103,7 @@ function renderInstallmentPlansList(plans) {
     const container = document.getElementById('installment-plans-list');
 
     if (plans.length === 0) {
-        container.innerHTML = '<p class="empty-state-text">No installment plans yet</p>';
+        container.innerHTML = `<p class="empty-state-text">${_t('No installment plans yet')}</p>`;
         return;
     }
 
@@ -2062,11 +2114,10 @@ function renderInstallmentPlansList(plans) {
                 <div class="plan-info">
                     <strong>${escapeHtml(p.description)}</strong>
                     <span class="plan-meta">
-                        ${formatCurrency(p.total_amount, p.currency)} over ${p.num_installments} months
-                        (${p.installments_paid}/${p.num_installments} paid) - ${escapeHtml(card?.name || 'Unknown card')}
+                        ${_t('{amount} over {n} months ({paid}/{n} paid) - {card}', { amount: formatCurrency(p.total_amount, p.currency), n: p.num_installments, paid: p.installments_paid, card: escapeHtml(card?.name || _t('Unknown card')) })}
                     </span>
                 </div>
-                <button type="button" class="icon-btn" onclick="deleteInstallmentPlan(${p.id})" title="Delete plan and its charges">🗑️</button>
+                <button type="button" class="icon-btn" onclick="deleteInstallmentPlan(${p.id})" title="${_t('Delete plan and its charges')}">🗑️</button>
             </div>
         `;
     }).join('');
@@ -2095,9 +2146,9 @@ async function saveInstallmentPlan(event) {
             // Replace the single full-amount purchase with the installments.
             await API.Transactions.delete(splitSourceTransaction.id);
             splitSourceTransaction = null;
-            showNotification('Transaction split into installments', 'success');
+            showNotification(_t('Transaction split into installments'), 'success');
         } else {
-            showNotification('Installment plan created', 'success');
+            showNotification(_t('Installment plan created'), 'success');
         }
 
         document.getElementById('installment-plan-form').reset();
@@ -2107,29 +2158,29 @@ async function saveInstallmentPlan(event) {
         }
     } catch (error) {
         console.error('Failed to create installment plan:', error);
-        showNotification('Failed to create installment plan', 'error');
+        showNotification(_t('Failed to create installment plan'), 'error');
     }
 }
 
 async function deleteInstallmentPlan(id) {
-    if (!confirm('Delete this plan and all of its generated charges (past and future)?')) return;
+    if (!confirm(_t('Delete this plan and all of its generated charges (past and future)?'))) return;
 
     try {
         await API.InstallmentPlans.delete(id);
-        showNotification('Installment plan deleted', 'success');
+        showNotification(_t('Installment plan deleted'), 'success');
         await loadInstallmentPlans();
         if (currentView === 'transactions') {
             await loadTransactions(currentFilters, currentPage);
         }
     } catch (error) {
         console.error('Failed to delete installment plan:', error);
-        showNotification('Failed to delete installment plan', 'error');
+        showNotification(_t('Failed to delete installment plan'), 'error');
     }
 }
 
 function showAddCategoryModal() {
     currentCategory = null;
-    document.getElementById('category-modal-title').textContent = 'Add Category';
+    document.getElementById('category-modal-title').textContent = _t('Add Category');
     document.getElementById('category-form').reset();
     document.getElementById('category-id').value = '';
     document.getElementById('category-color').value = '#6B7280';
@@ -2145,7 +2196,7 @@ async function editCategory(id) {
         const category = await API.Categories.getById(id);
         currentCategory = category;
 
-        document.getElementById('category-modal-title').textContent = 'Edit Category';
+        document.getElementById('category-modal-title').textContent = _t('Edit Category');
         document.getElementById('category-id').value = category.id;
         document.getElementById('category-name').value = category.name;
         document.getElementById('category-type').value = category.category_type || 'expense';
@@ -2160,7 +2211,7 @@ async function editCategory(id) {
         document.getElementById('modal-category').style.display = 'block';
     } catch (error) {
         console.error('Failed to load category:', error);
-        showNotification('Failed to load category', 'error');
+        showNotification(_t('Failed to load category'), 'error');
     }
 }
 
@@ -2170,7 +2221,7 @@ async function loadCategoryRules(categoryId) {
         renderCategoryRules(rules);
     } catch (error) {
         console.error('Failed to load rules:', error);
-        showNotification('Failed to load rules', 'error');
+        showNotification(_t('Failed to load rules'), 'error');
     }
 }
 
@@ -2186,14 +2237,14 @@ function renderCategoryRules(rules) {
     const container = document.getElementById('category-rules-list');
 
     if (rules.length === 0) {
-        container.innerHTML = '<p class="empty-state-text">No rules yet - transactions won\'t be auto-categorized here.</p>';
+        container.innerHTML = `<p class="empty-state-text">${_t("No rules yet - transactions won't be auto-categorized here.")}</p>`;
         return;
     }
 
     container.innerHTML = rules.map(r => `
         <div class="rule-item">
-            <span class="rule-text">${RULE_MATCH_LABELS[r.match_type] || r.match_type} "${escapeHtml(r.value)}"</span>
-            <button type="button" class="icon-btn" onclick="deleteCategorizationRule(${r.id})" title="Delete rule">🗑️</button>
+            <span class="rule-text">${_t(RULE_MATCH_LABELS[r.match_type] || r.match_type)} "${escapeHtml(r.value)}"</span>
+            <button type="button" class="icon-btn" onclick="deleteCategorizationRule(${r.id})" title="${_t('Delete rule')}">🗑️</button>
         </div>
     `).join('');
 }
@@ -2203,7 +2254,7 @@ async function addCategorizationRule() {
     const value = document.getElementById('new-rule-value').value.trim();
 
     if (!value) {
-        showNotification('Enter text for the rule to match', 'error');
+        showNotification(_t('Enter text for the rule to match'), 'error');
         return;
     }
     if (!currentCategory) return;
@@ -2216,23 +2267,23 @@ async function addCategorizationRule() {
         });
         document.getElementById('new-rule-value').value = '';
         await loadCategoryRules(currentCategory.id);
-        showNotification('Rule added', 'success');
+        showNotification(_t('Rule added'), 'success');
     } catch (error) {
         console.error('Failed to add rule:', error);
-        showNotification('Failed to add rule', 'error');
+        showNotification(_t('Failed to add rule'), 'error');
     }
 }
 
 async function deleteCategorizationRule(ruleId) {
-    if (!confirm('Delete this rule?')) return;
+    if (!confirm(_t('Delete this rule?'))) return;
 
     try {
         await API.CategorizationRules.delete(ruleId);
         await loadCategoryRules(currentCategory.id);
-        showNotification('Rule deleted', 'success');
+        showNotification(_t('Rule deleted'), 'success');
     } catch (error) {
         console.error('Failed to delete rule:', error);
-        showNotification('Failed to delete rule', 'error');
+        showNotification(_t('Failed to delete rule'), 'error');
     }
 }
 
@@ -2251,10 +2302,10 @@ async function saveCategory(event) {
 
         if (categoryId) {
             await API.Categories.update(parseInt(categoryId), categoryData);
-            showNotification('Category updated', 'success');
+            showNotification(_t('Category updated'), 'success');
         } else {
             await API.Categories.create(categoryData);
-            showNotification('Category created', 'success');
+            showNotification(_t('Category created'), 'success');
         }
 
         closeModal();
@@ -2262,21 +2313,21 @@ async function saveCategory(event) {
         await loadInitialData(); // Reload for dropdowns
     } catch (error) {
         console.error('Failed to save category:', error);
-        showNotification('Failed to save category', 'error');
+        showNotification(_t('Failed to save category'), 'error');
     }
 }
 
 async function deleteCategory(id) {
-    if (!confirm('Are you sure you want to delete this category?')) return;
+    if (!confirm(_t('Are you sure you want to delete this category?'))) return;
 
     try {
         await API.Categories.delete(id);
-        showNotification('Category deleted', 'success');
+        showNotification(_t('Category deleted'), 'success');
         await loadCategories();
         await loadInitialData();
     } catch (error) {
         console.error('Failed to delete category:', error);
-        showNotification('Failed to delete category', 'error');
+        showNotification(_t('Failed to delete category'), 'error');
     }
 }
 
@@ -2296,12 +2347,12 @@ async function saveEmailSource(event) {
 
     try {
         await API.EmailSources.create(sourceData);
-        showNotification('Email source added', 'success');
+        showNotification(_t('Email source added'), 'success');
         closeModal();
         await loadSettings();
     } catch (error) {
         console.error('Failed to save email source:', error);
-        showNotification('Failed to save email source', 'error');
+        showNotification(_t('Failed to save email source'), 'error');
     }
 }
 
