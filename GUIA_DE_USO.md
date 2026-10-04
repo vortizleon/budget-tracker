@@ -84,13 +84,22 @@ iniciar sesión primero).
    paso 5.
 
    ![Configuración de OAuth creada](docs/img/google-auth-3-listo.webp)
-4. Agrégate como usuario de prueba: en el menú de la izquierda, entra a
-   **Público** (Audience) (o ve a
-   **https://console.cloud.google.com/auth/audience**), baja a **Usuarios de
-   prueba** (Test users) → **Add users** → agrega tu propio correo de Gmail →
-   **Guardar**. El estado de publicación debe quedar en **Testing**
-   (déjalo así). Si te saltas este paso, Google te bloquea más adelante con
-   un error de "acceso no verificado".
+4. Revisa que estés como usuario de prueba: en el menú de la izquierda,
+   entra a **Público** (o ve a
+   **https://console.cloud.google.com/auth/audience**) y baja a **Usuarios de
+   prueba** (Test users). El estado de publicación debe decir **Prueba**
+   (Testing): déjalo así.
+   - **Si tu correo ya aparece en la lista** (a veces Google lo agrega solo
+     al crear el proyecto): no tienes que hacer nada, sigue al paso 5.
+   - **Si la lista está vacía:** clic en **Add users** → escribe tu correo
+     de Gmail → **Guardar**.
+   - Si intentas agregar un correo que ya está en la lista, Google muestra
+     **"No se agregaron cuentas no aptas"** (aunque el correo sí sea válido).
+     Es un aviso inofensivo: clic en **Cerrar** y revisa que el correo esté
+     en la lista.
+
+   Si el correo no está en esa lista, Google te bloquea más adelante con un
+   error de "acceso no verificado".
 5. Crea las credenciales: en el menú de la izquierda, entra a **Clientes**
    (Clients) (o ve a **https://console.cloud.google.com/auth/clients**) →
    **Crear cliente** (Create client).
