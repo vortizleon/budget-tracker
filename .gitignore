@@ -44,6 +44,7 @@ CLAUDE.md
 
 # Runtime
 .server.log
+backups/
 
 # IDE
 .vscode/

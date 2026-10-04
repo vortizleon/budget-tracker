@@ -9,6 +9,7 @@ Subcommands:
   report          Print a monthly spending summary (defaults to the current month).
   delete-all      Wipe all transactions (keeps cards/accounts/categories/sources).
   refresh-oauth   Force a fresh Gmail OAuth login (discards the stored token).
+  update          Download the latest version from GitHub (keeps your data) - runs Actualizar.command.
 """
 import argparse
 import calendar
@@ -284,6 +285,10 @@ def cmd_refresh_oauth(args):
     print("✓ Gmail re-authenticated.")
 
 
+def cmd_update(args):
+    subprocess.run(["bash", str(BASE_DIR / "Actualizar.command")])
+
+
 def main():
     parser = argparse.ArgumentParser(prog="finance-app")
     parser.set_defaults(func=cmd_open)
@@ -318,6 +323,9 @@ def main():
 
     oauth_parser = subparsers.add_parser("refresh-oauth", help="Force a fresh Gmail OAuth login")
     oauth_parser.set_defaults(func=cmd_refresh_oauth)
+
+    update_parser = subparsers.add_parser("update", help="Download the latest version (keeps your data)")
+    update_parser.set_defaults(func=cmd_update)
 
     args = parser.parse_args()
     args.func(args)

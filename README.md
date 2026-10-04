@@ -31,6 +31,7 @@ Once set up (see below), everything day-to-day goes through the `finance-app` co
 | `finance-app restart` | Restarts the server - use this after any backend (`.py`) code change |
 | `finance-app delete-all [--yes]` | Wipes all transactions (keeps cards/accounts/categories/rules). Prompts for confirmation unless `--yes` |
 | `finance-app refresh-oauth` | Forces a fresh Gmail login if the stored token stops working |
+| `finance-app update` | Downloads the latest version from GitHub and copies it over this folder (same as double-clicking `Actualizar.command`). Keeps `credentials.json`, `token.json`, `*.db`, `.env` and `venv/`; backs up the database to `backups/` first |
 
 **Examples:**
 
@@ -169,6 +170,7 @@ Your bank emails might have different format. To customize:
 ```
 budgeting-app/
 ├── Instalar.command         # Double-click installer for non-developer users (macOS, installs uv + Python, no Homebrew/Xcode)
+├── Actualizar.command       # Double-click updater: pulls the latest version, keeps your data
 ├── Abrir.command            # Double-click launcher: starts the server and opens the dashboard (no CLI needed)
 ├── GUIA_DE_USO.md           # Spanish-language setup + usage guide, for friends
 ├── finance-app               # CLI wrapper -> backend/manage.py (symlinked onto PATH)
