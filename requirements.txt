@@ -15,9 +15,7 @@ google-auth-httplib2==0.2.0
 google-api-python-client==2.154.0
 
 # Utilities
-python-dotenv==1.0.1
 pydantic==2.10.3
-pydantic-settings==2.7.0
 
 # Date/time handling
 python-dateutil==2.9.0
