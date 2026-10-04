@@ -110,10 +110,10 @@ iniciar sesión primero).
    JSON**. (Si la cerraste: en **Clientes**, clic en el nombre del cliente
    que creaste → **Descargar JSON**.)
 7. Ve a tu carpeta de **Descargas** y busca ese archivo (algo como
-   `client_secret_123456.json`):
-   - Renómbralo a exactamente: **`credentials.json`**
-   - Muévelo a la carpeta de la app (`Documents/budget-tracker`), justo al
-     lado de `Instalar.command`.
+   `client_secret_123456.json`). Muévelo a la carpeta de la app
+   (`Documents/budget-tracker`), justo al lado de `Instalar.command`.
+   **No hace falta renombrarlo**: la app detecta solo el archivo de Google
+   (lo renombra a `credentials.json` por ti).
 8. Vuelve a la sección 2: haz doble clic en **`Instalar.command`** otra vez.
 
 > **Nota:** Google cambia estas pantallas de vez en cuando. Si algo no se ve

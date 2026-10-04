@@ -77,7 +77,7 @@ uv venv --python 3.13 venv
 uv pip install --python venv/bin/python -r requirements.txt
 ```
 
-**Gmail API setup:** each person who runs this app needs their own Google Cloud project with the Gmail API enabled and a `credentials.json` downloaded to the project root — see the "Configura tu proyecto de Google" section in [GUIA_DE_USO.md](GUIA_DE_USO.md) for the exact steps (it's in Spanish, but the Google Cloud Console click-path is the same regardless).
+**Gmail API setup:** each person who runs this app needs their own Google Cloud project with the Gmail API enabled and the OAuth client JSON downloaded to the project root (any `*.json` desktop-client file is auto-renamed to `credentials.json`) — see the "Configura tu proyecto de Google" section in [GUIA_DE_USO.md](GUIA_DE_USO.md) for the exact steps (it's in Spanish, but the Google Cloud Console click-path is the same regardless).
 
 **Initialize the database.** Two ways to do this, both equivalent:
 
