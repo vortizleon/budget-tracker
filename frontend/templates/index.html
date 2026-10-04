@@ -380,6 +380,21 @@
                 </div>
 
                 <div class="settings-section">
+                    <h3>Google credentials</h3>
+                    <p id="credentials-status" class="field-hint">Checking...</p>
+                    <label id="credentials-dropzone" class="dropzone"
+                           ondragover="event.preventDefault(); this.classList.add('dragover')"
+                           ondragleave="this.classList.remove('dragover')"
+                           ondrop="handleCredentialsDrop(event)">
+                        <input type="file" id="credentials-file" accept=".json,application/json"
+                               onchange="handleCredentialsFile(this.files[0])" hidden>
+                        <strong>Drop your Google .json file here</strong>
+                        <span>or click to choose it (the client_secret_....json you downloaded from Google)</span>
+                    </label>
+                    <p class="field-hint">Stays on this computer. After uploading, click "Sync Now" below to log in to Gmail.</p>
+                </div>
+
+                <div class="settings-section">
                     <h3>Email Sources</h3>
                     <p class="field-hint">The bank addresses the app reads transaction alerts from - not your own email. BAC and Promerica are pre-loaded; add more here if you bank elsewhere.</p>
                     <div id="email-sources-list">

@@ -1638,13 +1638,15 @@ function renderCategories(categories) {
 
 async function loadSettings() {
     try {
-        const [emailSources, syncStatus] = await Promise.all([
+        const [emailSources, syncStatus, credStatus] = await Promise.all([
             API.EmailSources.getAll(),
             API.Sync.getStatus().catch(() => ({ last_sync: null })),
+            API.Credentials.getStatus().catch(() => null),
         ]);
 
         renderEmailSources(emailSources);
         renderSyncStatus(syncStatus);
+        renderCredentialsStatus(credStatus);
     } catch (error) {
         console.error('Failed to load settings:', error);
         showNotification('Failed to load settings', 'error');
@@ -1752,6 +1754,47 @@ async function triggerRecategorize() {
         btn.disabled = false;
         btn.textContent = originalLabel;
     }
+}
+
+function renderCredentialsStatus(status) {
+    const el = document.getElementById('credentials-status');
+    if (!el) return;
+    if (!status) {
+        el.textContent = 'Could not check the credentials file.';
+    } else if (!status.has_credentials) {
+        el.textContent = '✗ No Google file yet - upload it below to connect Gmail.';
+    } else if (!status.has_token) {
+        el.textContent = '✓ Google file in place. Click "Sync Now" to log in to Gmail.';
+    } else {
+        el.textContent = '✓ Google file in place and Gmail connected.';
+    }
+}
+
+async function handleCredentialsFile(file) {
+    if (!file) return;
+    try {
+        const content = await file.text();
+        const result = await API.Credentials.upload(content);
+        showNotification(
+            result.token_removed
+                ? 'Credentials replaced - click "Sync Now" to log in again'
+                : 'Credentials saved - click "Sync Now" to log in to Gmail',
+            'success'
+        );
+        renderCredentialsStatus(await API.Credentials.getStatus());
+    } catch (error) {
+        console.error('Credentials upload failed:', error);
+        showNotification(error.message, 'error');
+    } finally {
+        const input = document.getElementById('credentials-file');
+        if (input) input.value = '';
+    }
+}
+
+function handleCredentialsDrop(event) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('dragover');
+    handleCredentialsFile(event.dataTransfer.files[0]);
 }
 
 async function triggerReconnectGmail() {
@@ -2268,6 +2311,8 @@ window.triggerSync = triggerSync;
 window.triggerSyncRange = triggerSyncRange;
 window.triggerRecategorize = triggerRecategorize;
 window.triggerReconnectGmail = triggerReconnectGmail;
+window.handleCredentialsFile = handleCredentialsFile;
+window.handleCredentialsDrop = handleCredentialsDrop;
 window.closeModal = closeModal;
 window.showAddCardModal = showAddCardModal;
 window.editCard = editCard;

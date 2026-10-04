@@ -20,11 +20,10 @@ descargados desde el navegador; así no aparece ningún aviso de seguridad.
 - Trabaja solo. Instala `uv` (que baja Python) y los componentes de la app.
   **No pide contraseña, no necesita Homebrew ni las herramientas de Xcode, y
   no requiere actualizar macOS.** Todo es LOCAL en tu computadora.
-- En algún momento se detiene y dice que falta el archivo `credentials.json`.
-  Es normal: eso es el siguiente paso (sección 3). Cierra la ventana.
-- Cuando tengas `credentials.json`, haz doble clic en `Instalar.command`
-  (en la carpeta `Documents/budget-tracker`) y sigue donde quedó. Es seguro
-  repetirlo las veces que haga falta.
+- Al terminar, **se abre la app en tu navegador**. Si todavía no tienes tu
+  archivo de Google (`.json`), no pasa nada: se consigue en la sección 3 y se
+  sube desde la propia app (**Settings → Google credentials**).
+- Es seguro volver a correr `Instalar.command` las veces que haga falta.
 
 ---
 
@@ -45,16 +44,18 @@ Opción A (2 minutos).**
    de quien te lo mandó**. El acceso solo existe cuando tú inicias sesión y
    das permiso (sección 5), y queda guardado únicamente en tu computadora.
    Solo funciona con los correos que ya agregaron a la lista.
-3. Guárdalo en la carpeta de la app (`Documents/budget-tracker`), justo al
-   lado de `Instalar.command`. No hace falta renombrarlo: la app lo detecta
-   sola.
-4. Vuelve a la sección 2 y haz doble clic en `Instalar.command` otra vez.
+3. Abre la app (doble clic en **"Budget Tracker"** en tu Escritorio, o en
+   `Abrir.command`), ve a **Settings → Google credentials** y **arrastra el
+   archivo ahí** (o haz clic para elegirlo). No hace falta renombrarlo.
+   *(Alternativa: guárdalo en la carpeta `Documents/budget-tracker` y haz
+   doble clic en `Instalar.command`; la app lo detecta sola.)*
+4. Pasa a la sección 4.
 5. Cuando conectes Gmail (sección 5) Google va a mostrar una pantalla que
    dice **"Google no verificó esta app"** y **"solo continúa si conoces al
    desarrollador que te invitó"**. Es lo esperado: haz clic en **Avanzado**
    → **Ir a Budget Tracker (no seguro)** → **Permitir**.
 
-Con esta opción **te saltas la Opción B**; pasa directo a la sección 4.
+Con esta opción **te saltas la Opción B**.
 
 <details>
 <summary><b>Opción B: crea tu propio proyecto de Google</b> (solo si nadie te puede invitar; toca para abrir)</summary>
@@ -140,11 +141,10 @@ iniciar sesión primero).
    del cliente que creaste → **Descargar JSON**.) Ese archivo es privado:
    no lo compartas ni lo subas a ningún lado.
 7. Ve a tu carpeta de **Descargas** y busca ese archivo (algo como
-   `client_secret_123456.json`). Muévelo a la carpeta de la app
-   (`Documents/budget-tracker`), justo al lado de `Instalar.command`.
-   **No hace falta renombrarlo**: la app detecta solo el archivo de Google
-   (lo renombra a `credentials.json` por ti).
-8. Vuelve a la sección 2: haz doble clic en **`Instalar.command`** otra vez.
+   `client_secret_123456.json`). En la app, ve a **Settings → Google
+   credentials** y **arrástralo ahí** (o haz clic para elegirlo). **No hace
+   falta renombrarlo.**
+8. Pasa a la sección 4.
 
 > **Nota:** Google cambia estas pantallas de vez en cuando. Si algo no se ve
 > igual, busca el equivalente por el nombre del botón. Los pasos siempre son:

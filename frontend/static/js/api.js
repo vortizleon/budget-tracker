@@ -615,6 +615,29 @@ const MaintenanceAPI = {
 };
 
 // ============================================================================
+// Google credentials API
+// ============================================================================
+
+const CredentialsAPI = {
+    /** @returns {Promise<object>} { has_credentials, has_token } */
+    async getStatus() {
+        return apiRequest('/api/settings/credentials');
+    },
+
+    /**
+     * Save the Google OAuth client file (the text of the downloaded .json).
+     * @param {string} content - file contents
+     * @returns {Promise<object>} { saved, replaced, token_removed }
+     */
+    async upload(content) {
+        return apiRequest('/api/settings/credentials', {
+            method: 'POST',
+            body: JSON.stringify({ content }),
+        });
+    },
+};
+
+// ============================================================================
 // Budgets & Income API
 // ============================================================================
 
@@ -701,6 +724,7 @@ window.API = {
     EmailSources: EmailSourcesAPI,
     Sync: SyncAPI,
     Maintenance: MaintenanceAPI,
+    Credentials: CredentialsAPI,
     Budgets: BudgetsAPI,
     Income: IncomeAPI,
 };
