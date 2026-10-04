@@ -26,7 +26,7 @@ echo ""
 if [[ "$(uname -s)" != "Darwin" ]]; then
   err "Esta app solo está preparada para Mac. Si estás en Windows, avísale a quien te la compartió."
   echo ""
-  read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
+  read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..." || true
   exit 1
 fi
 
@@ -43,13 +43,13 @@ if ! command -v uv >/dev/null 2>&1; then
   info "Instalando 'uv' (un instalador de Python liviano, no necesita contraseña ni Xcode)..."
   if ! curl -LsSf https://astral.sh/uv/install.sh | sh; then
     err "No se pudo descargar uv. Revisa tu conexión a internet y vuelve a intentar."
-    read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
+    read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..." || true
     exit 1
   fi
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
   if ! command -v uv >/dev/null 2>&1; then
     err "uv no quedó instalado correctamente. Avísale a quien te compartió la app."
-    read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
+    read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..." || true
     exit 1
   fi
 else
@@ -61,7 +61,7 @@ if [[ ! -x "venv/bin/python" ]]; then
   info "Creando el entorno de la app (descarga Python la primera vez)..."
   if ! uv venv --python 3.13 venv; then
     err "No se pudo crear el entorno. Avísale a quien te compartió la app."
-    read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
+    read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..." || true
     exit 1
   fi
   ok "Entorno creado."
@@ -70,7 +70,7 @@ fi
 info "Instalando los componentes necesarios (esto puede tardar un par de minutos)..."
 if ! uv pip install -q --python venv/bin/python -r requirements.txt; then
   err "Falló la instalación de componentes. Avísale a quien te compartió la app."
-  read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
+  read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..." || true
   exit 1
 fi
 ok "Componentes instalados."
@@ -149,4 +149,5 @@ echo "(en tu Escritorio) o en Abrir.command. No necesitas la Terminal."
 echo ""
 echo "Revisa la GUIA_DE_USO.md para el detalle de cada paso."
 echo ""
-read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
+read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..." || true
+exit 0
