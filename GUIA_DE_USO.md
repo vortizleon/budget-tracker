@@ -6,7 +6,7 @@
 **Terminal** (búscala con Cmd+Espacio) y pega esto, luego Enter:
 
 ```
-mkdir -p ~/Documents && curl -L https://github.com/vortizleon/budget-tracker/archive/refs/heads/main.tar.gz | tar -xz -C ~/Documents && mv ~/Documents/budget-tracker-main ~/Documents/budget-tracker
+[ -e ~/Documents/budget-tracker ] && echo "Ya existe ~/Documents/budget-tracker (ya la descargaste)" || (mkdir -p ~/Documents && curl -L https://github.com/vortizleon/budget-tracker/archive/refs/heads/main.tar.gz | tar -xz -C ~/Documents && mv ~/Documents/budget-tracker-main ~/Documents/budget-tracker && echo "Listo: ~/Documents/budget-tracker")
 ```
 
 La app queda en `Documents/budget-tracker`. (Los archivos bajados así no
@@ -123,10 +123,6 @@ manda* los avisos — no tu propio correo.
 
 ## 5. Primera sincronización
 
-> **Abrir la app después:** haz doble clic en **"Budget Tracker"** en tu
-> Escritorio (o en `Abrir.command` dentro de la carpeta). No necesitas la
-> Terminal. Si reiniciaste la Mac, solo vuelve a abrirla así.
-
 En la pestaña **Settings**, en la sección **Sync Status**, haz clic en el
 botón **Sync Now**.
 
@@ -147,6 +143,11 @@ diciendo cuántas transacciones nuevas encontró. ¡Ya está lista para usarse!
 
 ## 6. Uso del día a día
 
+**Abrir la app:** haz doble clic en **"Budget Tracker"** en tu Escritorio
+(o en `Abrir.command` dentro de la carpeta de la app). No necesitas la
+Terminal. Si reiniciaste la Mac, solo vuelve a abrirla así. La app corre
+solo en tu computadora; nadie más en tu red puede entrar.
+
 Todo lo normal se hace desde el navegador, en la pestaña **Settings**:
 
 | Botón | Qué hace |
@@ -164,7 +165,8 @@ Dentro del panel del navegador también puedes:
 - Asignar o corregir la categoría de cada transacción (pestaña Transactions).
 - Ver tus tarjetas, cuentas y suscripciones.
 
-**¿Prefieres la Terminal?** Todo lo de arriba también tiene su propio
+**¿Prefieres la Terminal?** (Opcional; abre una Terminal *nueva* después de
+instalar.) Todo lo de arriba también tiene su propio
 comando — `finance-app sync`, `finance-app report`, `finance-app
 refresh-oauth`, etc. Usa lo que te resulte más cómodo; ambos caminos hacen
 exactamente lo mismo. Ver el `README.md` del proyecto para la lista
@@ -180,6 +182,30 @@ Clic derecho sobre el archivo → Abrir → confirmar Abrir. Solo pasa la
 primera vez, y solo si bajaste el ZIP. Con la Opción A de la sección 1 no
 aparece. Después de correr el instalador, `Abrir.command` y el acceso
 directo del Escritorio ya no dan este aviso.
+
+**El instalador falló al descargar `uv` o Python**
+Revisa tu conexión a internet y vuelve a hacer doble clic en
+`Instalar.command`; es seguro repetirlo, salta lo que ya está hecho. Si estás
+en una red de trabajo o escuela, prueba con otra (a veces bloquean
+`astral.sh` o `github.com`).
+
+**No veo el acceso directo "Budget Tracker" en el Escritorio**
+Mac a veces pide permiso para que Terminal escriba en el Escritorio. Si lo
+negaste, usa `Abrir.command` dentro de la carpeta de la app (puedes arrastrarlo
+al Dock). Para recuperar el permiso: Ajustes del Sistema → Privacidad y
+seguridad → Archivos y carpetas → Terminal → Escritorio.
+
+**El navegador no abre / "no se puede conectar a localhost:8000"**
+Haz doble clic en `Abrir.command` otra vez. Si sigue sin funcionar, revisa
+el archivo `.server.log` dentro de la carpeta de la app (ahí queda el
+error) y mándaselo a quien te compartió la app. También puede ser que otro
+programa esté usando el puerto 8000.
+
+**Quiero actualizar a una versión nueva**
+Baja la versión nueva con la Opción A o B de la sección 1 en una carpeta
+distinta y copia a la nueva carpeta tus archivos `credentials.json`,
+`token.json` y `budgeting.db` (son tus datos). Luego haz doble clic en
+`Instalar.command` de la carpeta nueva.
 
 **"Google dice que la app no está verificada / no es segura"**
 Es normal y esperado — hiciste tu propio proyecto solo para ti en el paso 3,
