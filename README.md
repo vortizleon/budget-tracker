@@ -111,7 +111,7 @@ finance-app sync   # equivalent from the terminal; first run triggers the Gmail 
 
 Every day-to-day CLI command also has a UI equivalent in the Settings tab (Sync Now, date-range sync, re-apply category rules, reconnect Gmail) — use whichever you prefer, they call the same backend logic.
 
-Or run the server directly without the CLI: `venv/bin/uvicorn backend.api:app --reload --host 0.0.0.0 --port 8000`.
+Or run the server directly without the CLI: `venv/bin/uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000`.
 
 ---
 

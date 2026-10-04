@@ -44,7 +44,7 @@ def start_server():
     with open(log_path, "a") as log:
         subprocess.Popen(
             [str(BASE_DIR / "venv" / "bin" / "python"), "-m", "uvicorn", "backend.api:app",
-             "--host", "0.0.0.0", "--port", str(PORT)],
+             "--host", "127.0.0.1", "--port", str(PORT)],
             cwd=str(BASE_DIR),
             stdout=log,
             stderr=subprocess.STDOUT,
