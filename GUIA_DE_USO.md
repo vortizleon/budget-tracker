@@ -72,9 +72,18 @@ iniciar sesión primero).
      **Siguiente**.
 
      ![Paso 2 del asistente: Público](docs/img/google-auth-2-publico.webp)
-   - **Información de contacto:** tu correo → Siguiente.
+   - **Información de contacto:** escribe o elige tu correo (es donde Google
+     te avisaría de cambios en el proyecto) → **Siguiente**.
    - **Finalizar:** marca la casilla de aceptar la política de datos de
-     usuario → **Continuar** → **Crear**.
+     usuario de los servicios de las API de Google y guarda con
+     **Continuar** / **Crear**.
+
+   Cuando termine, ves la pantalla "Descripción general de OAuth" con un
+   aviso azul abajo que dice **"Se creó la configuración de OAuth"**. Que
+   diga "Aún no configuraste ningún cliente de OAuth" es normal, eso va en el
+   paso 5.
+
+   ![Configuración de OAuth creada](docs/img/google-auth-3-listo.webp)
 4. Agrégate como usuario de prueba: en el menú de la izquierda, entra a
    **Público** (Audience) (o ve a
    **https://console.cloud.google.com/auth/audience**), baja a **Usuarios de
