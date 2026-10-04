@@ -60,8 +60,12 @@ iniciar sesión primero).
 3. Configura Google Auth Platform (antes llamada "pantalla de consentimiento
    de OAuth"): entra a **https://console.cloud.google.com/auth/overview** y
    haz clic en **Comenzar** (Get started). Es un asistente de 4 pantallas:
-   - **Información de la app:** nombre `Budget Tracker` y tu correo como
-     correo de asistencia → Siguiente.
+   - **Información de la app:** en "Nombre de la aplicación" escribe
+     `Budget Tracker`. En "Correo electrónico de asistencia al usuario" es
+     una lista desplegable: ábrela y elige tu correo (si lo dejas vacío
+     marca error en rojo). Clic en **Siguiente**.
+
+     ![Paso 1 del asistente: Información de la app](docs/img/google-auth-1-info-app.webp)
    - **Público (Audience):** elige **Externo** (External) → Siguiente.
    - **Información de contacto:** tu correo → Siguiente.
    - **Finalizar:** marca la casilla de aceptar la política de datos de
