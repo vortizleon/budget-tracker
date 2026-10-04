@@ -359,6 +359,18 @@ const TransactionsAPI = {
      * @param {object} transactionData - Updated transaction data
      * @returns {Promise<object>} Updated transaction
      */
+    /**
+     * Create a transaction by hand.
+     * @param {object} transactionData - { date, amount, currency, commerce_name, transaction_type, card_id, category_id, notes }
+     * @returns {Promise<object>} The created transaction
+     */
+    async create(transactionData) {
+        return apiRequest('/api/transactions', {
+            method: 'POST',
+            body: JSON.stringify(transactionData),
+        });
+    },
+
     async update(id, transactionData) {
         return apiRequest(`/api/transactions/${id}`, {
             method: 'PUT',

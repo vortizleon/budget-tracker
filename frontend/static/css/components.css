@@ -371,6 +371,17 @@
 }
 
 
+/* Two fields side by side in a modal form */
+.form-row {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.form-row .form-group {
+    flex: 1;
+    min-width: 0;
+}
+
 /* Language switch (EN | ES) in the sidebar header */
 .lang-switch {
     display: inline-flex;
