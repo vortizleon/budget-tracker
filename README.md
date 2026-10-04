@@ -80,6 +80,10 @@ uv pip install --python venv/bin/python -r requirements.txt
 
 **Gmail API setup:** each person who runs this app needs their own Google Cloud project with the Gmail API enabled and the OAuth client JSON downloaded to the project root (any `*.json` desktop-client file is auto-renamed to `credentials.json`) — see the "Configura tu proyecto de Google" section in [GUIA_DE_USO.md](GUIA_DE_USO.md) for the exact steps (it's in Spanish, but the Google Cloud Console click-path is the same regardless).
 
+**Sharing with friends (they skip Google Cloud):** keep your own Google Cloud project in **Testing** status with the Gmail API enabled and a Desktop-app OAuth client. For each friend, add their Gmail under *Google Auth Platform → Audience → Test users* (max 100), then send them the client's `client_secret_*.json` **privately** (never commit it - the repo is public). They drop it in the project folder, the installer renames it, and they click through Google's "unverified app" warning once. Gmail access expires about every 7 days while the project is in Testing (they re-run *Reconnect Gmail*). Their mail and tokens stay on their own machine; you only manage the test-user list.
+
+**What to send, and what never to send:** the client file (`client_secret_*.json`) only identifies the app - it grants no mailbox access, so it's the one file you share (privately). Never send `token.json` (it grants read access to *your* Gmail), `budgeting.db` (your transactions) or a zip of your whole project folder, which contains both. Friends get the code from the install command in the guide, not from your folder. To cut off access later, revoke the app at `myaccount.google.com/permissions` or delete/rotate the client in Google Cloud.
+
 **Initialize the database.** Two ways to do this, both equivalent:
 
 ```bash
