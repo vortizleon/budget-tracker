@@ -28,12 +28,40 @@ descargados desde el navegador; así no aparece ningún aviso de seguridad.
 
 ---
 
-## 3. Configura tu proyecto de Google
+## 3. Consigue tu archivo de Google
 
-Esta es la única parte que **cada persona tiene que hacer por su cuenta**.
-Gmail no permite que una sola app lea el correo de varias personas distintas
-sin que cada quien autorice su propio acceso — por eso cada quien necesita
-su propio "proyecto" en Google Cloud. Toma unos 5 minutos y es gratis.
+Para leer tu Gmail la app necesita un archivo `.json` de Google. Hay dos
+formas de conseguirlo. **Si conoces a quien te compartió la app, usa la
+Opción A (2 minutos).**
+
+### Opción A (recomendada): que quien te compartió la app te invite
+
+1. Mándale por mensaje el correo de **Gmail donde recibes los avisos de tu
+   banco**. Esa persona te agrega como "usuario de prueba" en su proyecto de
+   Google.
+2. Te va a mandar un archivo que se llama algo como
+   `client_secret_123456.json`. Es **privado**: no lo compartas ni lo subas
+   a ningún lado. Solo identifica a la app: **no da acceso a tu correo ni al
+   de quien te lo mandó**. El acceso solo existe cuando tú inicias sesión y
+   das permiso (sección 5), y queda guardado únicamente en tu computadora.
+   Solo funciona con los correos que ya agregaron a la lista.
+3. Guárdalo en la carpeta de la app (`Documents/budget-tracker`), justo al
+   lado de `Instalar.command`. No hace falta renombrarlo: la app lo detecta
+   sola.
+4. Vuelve a la sección 2 y haz doble clic en `Instalar.command` otra vez.
+5. Cuando conectes Gmail (sección 5) Google va a mostrar una pantalla que
+   dice **"Google no verificó esta app"** y **"solo continúa si conoces al
+   desarrollador que te invitó"**. Es lo esperado: haz clic en **Avanzado**
+   → **Ir a Budget Tracker (no seguro)** → **Permitir**.
+
+Con esta opción **te saltas todo lo que sigue**; pasa directo a la sección 4.
+
+### Opción B: crea tu propio proyecto de Google
+
+Úsala si nadie te puede invitar. Toma unos 5 minutos y es gratis.
+
+Aquí tú creas tu propio "proyecto" en Google Cloud: así nadie más está
+involucrado en el acceso a tu correo.
 
 Usa la cuenta de Gmail de donde quieres leer los correos del banco. Cada
 enlace de abajo te lleva directo a la pantalla que necesitas (puede pedirte
@@ -158,7 +186,7 @@ En la pestaña **Settings**, en la sección **Sync Status**, haz clic en el
 botón **Sync Now**.
 
 La primera vez se va a abrir tu navegador pidiéndote iniciar sesión con la
-cuenta de Gmail que usaste en el paso 3, y dar permiso de **solo lectura**
+cuenta de Gmail que registraste en la sección 3, y dar permiso de **solo lectura**
 sobre tu correo (la app nunca puede enviar correos ni borrar nada).
 
 Vas a ver una pantalla de Google que dice algo como **"Google no verificó
@@ -241,19 +269,24 @@ abierta, la reinicia sola. También puedes correr `finance-app update` en la
 Terminal.
 
 **"Google dice que la app no está verificada / no es segura"**
-Es normal y esperado — hiciste tu propio proyecto solo para ti en el paso 3,
-y solo tú (como "usuario de prueba") puedes usarlo. Clic en Avanzado →
-continuar.
+Es normal y esperado: la app está en "modo de prueba" y solo pueden usarla
+los correos agregados como "usuarios de prueba" (por quien te invitó, o por
+ti en la Opción B). Clic en Avanzado → Ir a Budget Tracker → Permitir.
+
+**"Access blocked" / "no tienes acceso" con la Opción A**
+Tu correo no está en la lista de usuarios de prueba de quien te invitó, o
+entraste con otra cuenta de Gmail. Confirma con esa persona que agregó
+exactamente el correo con el que estás iniciando sesión.
 
 **"Access blocked: this app's request is invalid"**
-Te faltó agregarte como "usuario de prueba" en el paso 4 de la sección
-"Configura tu proyecto de Google". Entra a
-https://console.cloud.google.com/apis/credentials/consent y agrégate en
-"Usuarios de prueba".
+Tu correo no está en la lista de "usuarios de prueba". Con la Opción A, pídele
+a quien te invitó que te agregue. Con la Opción B, entra a
+https://console.cloud.google.com/auth/audience y agrégate en
+"Usuarios de prueba" (paso 4).
 
 **Dejó de sincronizar / dice que el token expiró** (puede pasar cada ~7 días)
-Mientras tu proyecto de Google esté en modo **Testing** (como lo dejamos en
-el paso 4), Google hace que el permiso caduque a los 7 días. No es un error
+Mientras el proyecto de Google esté en modo **Testing** (así debe quedar),
+Google hace que el permiso caduque a los 7 días. No es un error
 de la app. En Settings, clic en **Reconnect Gmail** y luego en **Sync Now**
 para volver a autorizar el acceso. (O, por Terminal: `finance-app refresh-oauth`.)
 
