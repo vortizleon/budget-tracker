@@ -508,3 +508,171 @@ class BalanceSummary(BaseModel):
     total_available_crc: Decimal
     total_available_usd: Decimal
     savings_accounts: List[AccountBalanceDetail]
+
+
+# ============================================================================
+# Budget Schemas
+# ============================================================================
+
+class BudgetUpsert(BaseModel):
+    """Create or update a category budget. Send exactly one of percentage /
+    amount - the other gets derived from the month's income."""
+    category_id: int
+    percentage: Optional[Decimal] = Field(None, ge=0, le=100)
+    amount: Optional[Decimal] = Field(None, ge=0)
+
+
+class BudgetLine(BaseModel):
+    """One category's budget for a given month, with spending against it."""
+    id: int
+    category_id: int
+    category_name: str
+    category_color: Optional[str] = None
+    category_icon: Optional[str] = None
+    anchor: str  # "percentage" or "amount" - which one the user set
+    is_protected: bool
+    percentage: Decimal  # as planned, before debt
+    amount: Decimal  # as planned, before debt
+    adjusted_amount: Decimal  # after debt payments (= amount if protected)
+    spent: Decimal  # CRC, USD purchases converted at the settings rate
+    remaining: Decimal  # adjusted_amount - spent
+
+
+class BudgetProtectedUpdate(BaseModel):
+    is_protected: bool
+
+
+class BudgetDebtLine(BaseModel):
+    """One card's debt payment for the month, from its payoff plan. `amount`
+    is only the part of the payment beyond the card's expected new spending
+    (that spending is already counted in category budgets)."""
+    card_id: int
+    card_name: str
+    payment_crc: Decimal
+    payment_usd: Decimal
+    spend_crc: Decimal  # usual purchases + this month's cuotas
+    spend_usd: Decimal
+    installments_crc: Decimal  # the Tasa Cero part of spend_*
+    installments_usd: Decimal
+    amount: Decimal  # CRC
+
+
+class IncomeEntryCreate(BaseModel):
+    """Schema for logging a paycheck."""
+    date: date
+    amount: Decimal = Field(gt=0)
+    currency: str = "CRC"
+    description: Optional[str] = None
+
+
+class IncomeEntryResponse(IncomeEntryCreate):
+    """Schema for income entry response."""
+    id: int
+    amount_crc: Decimal
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BudgetSettingsUpdate(BaseModel):
+    """Schema for updating budget settings (all fields optional)."""
+    expected_monthly_income: Optional[Decimal] = Field(None, ge=0)
+    usd_to_crc_rate: Optional[Decimal] = Field(None, gt=0)
+
+
+class BudgetSettingsResponse(BaseModel):
+    """Schema for budget settings response."""
+    expected_monthly_income: Optional[Decimal] = None
+    usd_to_crc_rate: Decimal
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BudgetOverview(BaseModel):
+    """Everything the Budgets view needs for one month."""
+    month: str  # "YYYY-MM"
+    settings: BudgetSettingsResponse
+    income_entries: List[IncomeEntryResponse]
+    income_received: Decimal  # CRC total logged for the month
+    income_base: Decimal  # what percentages are applied to
+    lines: List[BudgetLine]
+    debt_lines: List[BudgetDebtLine]
+    total_debt: Decimal
+    reduction_percentage: Decimal  # how much non-protected budgets shrink for debt
+    debt_shortfall: Decimal  # debt that doesn't fit even with flexible budgets at 0
+    total_budgeted: Decimal  # adjusted, excluding debt
+    total_percentage: Decimal
+    total_spent: Decimal
+    unbudgeted: Decimal  # income_base - debt - total_budgeted (savings / free money)
+    unbudgeted_spent: Decimal  # spending in categories with no budget
+
+
+# ============================================================================
+# Card Payoff Plan Schemas
+# ============================================================================
+
+class CardPayoffPlanUpdate(BaseModel):
+    """Create or replace a card's payoff plan. monthly_spend_* = None means
+    "use the card's recent average"."""
+    balance_as_of: date
+    balance_crc: Decimal = Field(default=0, ge=0)
+    balance_usd: Decimal = Field(default=0, ge=0)
+    annual_rate_crc: Decimal = Field(default=0, ge=0, le=200)
+    annual_rate_usd: Decimal = Field(default=0, ge=0, le=200)
+    monthly_payment_crc: Decimal = Field(default=0, ge=0)
+    monthly_payment_usd: Decimal = Field(default=0, ge=0)
+    monthly_spend_crc: Optional[Decimal] = Field(default=None, ge=0)
+    monthly_spend_usd: Optional[Decimal] = Field(default=None, ge=0)
+
+
+class CardPayoffPlanResponse(BaseModel):
+    """A card's saved plan (plan=None if none yet) plus the recent average
+    monthly spend on the card, used as the default spend estimate."""
+    card_id: int
+    plan: Optional[CardPayoffPlanUpdate] = None
+    avg_monthly_spend_crc: Decimal
+    avg_monthly_spend_usd: Decimal
+    avg_based_on_days: int  # how many days of history the average covers
+    # Tasa Cero charges still to come after balance_as_of, per month
+    # (index 0 = the as-of month) - added on top of the average spend.
+    scheduled_installments_crc: List[Decimal] = []
+    scheduled_installments_usd: List[Decimal] = []
+
+
+# ============================================================================
+# Month-end Forecast Schemas
+# ============================================================================
+
+class ForecastLine(BaseModel):
+    """One category's projected month-end spending (CRC)."""
+    category_id: Optional[int] = None  # None = transactions with no category
+    category_name: str
+    category_icon: Optional[str] = None
+    budget: Optional[Decimal] = None  # after debt; None = no budget
+    spent_so_far: Decimal  # through today, cuotas included
+    scheduled: Decimal  # Tasa Cero cuotas still to come this month
+    projected: Decimal  # spent_so_far + expected rest + scheduled
+    status: str  # "on_track" | "at_risk" | "over" | "no_budget"
+    basis: str  # "pace" | "history" | "blend" - how the rest was estimated
+    # The pieces behind `projected`, so the UI can show its work:
+    typical_month: Optional[Decimal] = None  # usual monthly total (no cuotas); None = no history
+    pace_month: Decimal  # this month's regular spending extrapolated to a full month
+    rest_from_typical: Decimal  # typical_month - spent (floored at 0)
+    rest_from_pace: Decimal  # pace for the days left
+    rest: Decimal  # the blended estimate actually used
+    pace_weight: Decimal  # 0..1, how much `rest` leans on pace
+
+
+class MonthForecast(BaseModel):
+    """Where the current month is headed at the current pace."""
+    month: str  # "YYYY-MM"
+    days_elapsed: int
+    days_in_month: int
+    history_months: int  # full past months used for typical spending
+    history_start: Optional[str] = None  # "YYYY-MM" of the first history month
+    pace_weight: Decimal  # 0..1 for blended categories - days elapsed / days in month
+    income_base: Decimal
+    total_debt: Decimal
+    spent_so_far: Decimal
+    projected_spend: Decimal
+    projected_left: Decimal  # income_base - projected_spend - total_debt
+    lines: List[ForecastLine]

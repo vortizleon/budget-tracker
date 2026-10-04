@@ -107,6 +107,28 @@ const CardsAPI = {
     async getBillingCycles(id) {
         return apiRequest(`/api/cards/${id}/billing-cycles`);
     },
+
+    /**
+     * Get a card's payoff plan (plan=null if none) + its recent monthly spend
+     * @param {number} id - Card ID
+     * @returns {Promise<object>}
+     */
+    async getPayoffPlan(id) {
+        return apiRequest(`/api/cards/${id}/payoff-plan`);
+    },
+
+    async savePayoffPlan(id, planData) {
+        return apiRequest(`/api/cards/${id}/payoff-plan`, {
+            method: 'PUT',
+            body: JSON.stringify(planData),
+        });
+    },
+
+    async deletePayoffPlan(id) {
+        return apiRequest(`/api/cards/${id}/payoff-plan`, {
+            method: 'DELETE',
+        });
+    },
 };
 
 // ============================================================================
@@ -378,6 +400,14 @@ const TransactionsAPI = {
 
 const AnalyticsAPI = {
     /**
+     * Projected month-end spending per category (current month)
+     * @returns {Promise<object>} MonthForecast
+     */
+    async getMonthForecast() {
+        return apiRequest('/api/analytics/month-forecast');
+    },
+
+    /**
      * Get dashboard summary
      * @param {object} filters - Date filters
      * @returns {Promise<object>} Dashboard summary data
@@ -584,6 +614,81 @@ const MaintenanceAPI = {
     },
 };
 
+// ============================================================================
+// Budgets & Income API
+// ============================================================================
+
+const BudgetsAPI = {
+    /**
+     * Get budgets, income and spending for a month
+     * @param {string} month - "YYYY-MM" (default: current month)
+     * @returns {Promise<object>} Budget overview
+     */
+    async getOverview(month) {
+        return apiRequest(`/api/budgets${month ? `?month=${month}` : ''}`);
+    },
+
+    /**
+     * Set a category's budget - send exactly one of percentage / amount
+     * @param {object} data - {category_id, percentage?, amount?}
+     * @returns {Promise<object>} {id}
+     */
+    async upsert(data) {
+        return apiRequest('/api/budgets', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+
+    async setProtected(id, isProtected) {
+        return apiRequest(`/api/budgets/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ is_protected: isProtected }),
+        });
+    },
+
+    async delete(id) {
+        return apiRequest(`/api/budgets/${id}`, {
+            method: 'DELETE',
+        });
+    },
+
+    async resetToSuggested() {
+        return apiRequest('/api/budgets/reset-suggested', {
+            method: 'POST',
+        });
+    },
+
+    /**
+     * @param {object} data - {expected_monthly_income?, usd_to_crc_rate?}
+     */
+    async updateSettings(data) {
+        return apiRequest('/api/budget-settings', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+};
+
+const IncomeAPI = {
+    /**
+     * Log a received payment
+     * @param {object} data - {date, amount, currency, description}
+     */
+    async create(data) {
+        return apiRequest('/api/income', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
+
+    async delete(id) {
+        return apiRequest(`/api/income/${id}`, {
+            method: 'DELETE',
+        });
+    },
+};
+
 // Export API objects for use in app.js
 window.API = {
     Cards: CardsAPI,
@@ -596,4 +701,6 @@ window.API = {
     EmailSources: EmailSourcesAPI,
     Sync: SyncAPI,
     Maintenance: MaintenanceAPI,
+    Budgets: BudgetsAPI,
+    Income: IncomeAPI,
 };

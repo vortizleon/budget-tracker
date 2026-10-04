@@ -232,3 +232,87 @@ class Subscription(Base):
 
     def __repr__(self):
         return f"<Subscription(name='{self.name}', amount={self.amount} {self.currency}, day={self.billing_day})>"
+
+
+class Budget(Base):
+    """Monthly spending budget for one expense category.
+
+    Exactly one of `percentage` / `amount` is set - whichever the user typed
+    last is the anchor, and the other is derived from the month's income
+    (see budgets.py). So a fixed bill like rent can stay at a set amount
+    while flexible categories scale with income. Amounts are always CRC."""
+    __tablename__ = "budgets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False, unique=True)
+    percentage = Column(DECIMAL(5, 2), nullable=True)  # % of monthly income
+    amount = Column(DECIMAL(12, 2), nullable=True)  # fixed CRC amount
+    # Essentials that can't be cut (rent, utilities). Debt payments shrink
+    # every other budget instead.
+    is_protected = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    category = relationship("Category")
+
+    def __repr__(self):
+        return f"<Budget(category_id={self.category_id}, percentage={self.percentage}, amount={self.amount})>"
+
+
+class IncomeEntry(Base):
+    """A paycheck (or other income) the user logs by hand when it arrives -
+    the bank alert emails only cover spending, so income isn't synced."""
+    __tablename__ = "income_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, nullable=False)  # month it counts toward = this date's month
+    amount = Column(DECIMAL(12, 2), nullable=False)
+    currency = Column(String, nullable=False, default="CRC")  # "CRC" or "USD"
+    description = Column(String)  # e.g. "1st payment"
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self):
+        return f"<IncomeEntry(date='{self.date}', amount={self.amount} {self.currency})>"
+
+
+class BudgetSettings(Base):
+    """Single-row table of budget-wide settings."""
+    __tablename__ = "budget_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # What the user expects to earn per month (CRC). Budgets are computed
+    # against this until enough real income has been logged to exceed it, so
+    # amounts don't halve between the 1st and 2nd paycheck.
+    expected_monthly_income = Column(DECIMAL(12, 2), nullable=True)
+    # Converts USD purchases/income into CRC for budget tracking.
+    usd_to_crc_rate = Column(DECIMAL(10, 2), nullable=False, default=505)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class CardPayoffPlan(Base):
+    """What the user owes on a credit card and how they plan to pay it down.
+    CRC and USD are separate balances (as on Costa Rican cards - each is
+    paid in its own currency), so every field comes in a pair. The payoff
+    projection itself is computed on the fly (frontend), not stored."""
+    __tablename__ = "card_payoff_plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    card_id = Column(Integer, ForeignKey("cards.id"), nullable=False, unique=True)
+    balance_as_of = Column(Date, nullable=False)  # date the balances were read off the statement/app
+
+    balance_crc = Column(DECIMAL(12, 2), nullable=False, default=0)
+    balance_usd = Column(DECIMAL(12, 2), nullable=False, default=0)
+    annual_rate_crc = Column(DECIMAL(5, 2), nullable=False, default=0)  # % per year
+    annual_rate_usd = Column(DECIMAL(5, 2), nullable=False, default=0)
+    monthly_payment_crc = Column(DECIMAL(12, 2), nullable=False, default=0)
+    monthly_payment_usd = Column(DECIMAL(12, 2), nullable=False, default=0)
+
+    # Expected new spending per month on the card. NULL = use the card's
+    # recent average (see payoff.py).
+    monthly_spend_crc = Column(DECIMAL(12, 2), nullable=True)
+    monthly_spend_usd = Column(DECIMAL(12, 2), nullable=True)
+
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    card = relationship("Card")

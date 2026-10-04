@@ -22,7 +22,7 @@ function ordinalSuffix(day) {
  */
 function formatCurrency(amount, currency) {
     const absAmount = Math.abs(amount);
-    const formatted = absAmount.toFixed(2);
+    const formatted = absAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     if (currency === 'CRC') {
         return `₡${formatted}`;
@@ -41,7 +41,7 @@ function formatCurrency(amount, currency) {
 function formatDate(dateString, includeTime = false) {
     if (!dateString) return '';
 
-    const date = new Date(dateString);
+    const date = parseDate(dateString);
     const options = {
         year: 'numeric',
         month: 'short',
@@ -54,6 +54,19 @@ function formatDate(dateString, includeTime = false) {
     }
 
     return date.toLocaleDateString('en-US', options);
+}
+
+/**
+ * Parse a date string. Date-only strings ("YYYY-MM-DD") are parsed as local
+ * dates - `new Date("2026-10-01")` treats them as UTC midnight, which shows
+ * up as the previous day in timezones behind UTC (e.g. Costa Rica, UTC-6).
+ * @param {string} dateString - ISO date or datetime string
+ * @returns {Date} Parsed date
+ */
+function parseDate(dateString) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return new Date(dateString);
 }
 
 /**
@@ -74,7 +87,7 @@ function formatDateForInput(date) {
  * @returns {string} Relative time string
  */
 function getRelativeTime(dateString) {
-    const date = new Date(dateString);
+    const date = parseDate(dateString);
     const now = new Date();
     const diffMs = now - date;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -222,7 +235,7 @@ function groupTransactionsByDate(transactions) {
  */
 function sortTransactionsByDate(transactions) {
     return transactions.sort((a, b) => {
-        return new Date(b.transaction_date) - new Date(a.transaction_date);
+        return parseDate(b.transaction_date) - parseDate(a.transaction_date);
     });
 }
 

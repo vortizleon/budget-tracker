@@ -35,22 +35,28 @@
                 </div>
             </div>
             <nav class="sidebar-nav">
-                <a href="#" data-view="dashboard" class="nav-link active">
+                <a href="/" data-view="dashboard" class="nav-link active">
                     <span class="nav-text">Dashboard</span>
                 </a>
-                <a href="#" data-view="cards" class="nav-link">
-                    <span class="nav-text">Cards</span>
+                <a href="/budgets" data-view="budgets" class="nav-link">
+                    <span class="nav-text">Budgets</span>
                 </a>
-                <a href="#" data-view="transactions" class="nav-link">
+                <a href="/transactions" data-view="transactions" class="nav-link">
                     <span class="nav-text">Transactions</span>
                 </a>
-                <a href="#" data-view="analytics" class="nav-link">
+                <a href="/analytics" data-view="analytics" class="nav-link">
                     <span class="nav-text">Analytics</span>
                 </a>
-                <a href="#" data-view="categories" class="nav-link">
+                <a href="/forecast" data-view="forecast" class="nav-link">
+                    <span class="nav-text">Forecast</span>
+                </a>
+                <a href="/categories" data-view="categories" class="nav-link">
                     <span class="nav-text">Categories</span>
                 </a>
-                <a href="#" data-view="settings" class="nav-link">
+                <a href="/cards" data-view="cards" class="nav-link">
+                    <span class="nav-text">Cards</span>
+                </a>
+                <a href="/settings" data-view="settings" class="nav-link">
                     <span class="nav-text">Settings</span>
                 </a>
             </nav>
@@ -119,6 +125,71 @@
                 </div>
             </div>
 
+            <!-- View: Budgets -->
+            <div id="view-budgets" class="view">
+                <div class="view-header">
+                    <h2>Budgets</h2>
+                    <div class="view-header-actions">
+                        <input type="month" id="budget-month" class="input budget-month-input" onchange="loadBudgets()">
+                        <button class="btn btn-primary" onclick="showIncomeModal()">
+                            <span>+ Add Payment</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="budget-overview">
+                    <div class="settings-section">
+                        <div class="summary-label">Left to Spend This Month</div>
+                        <div class="budget-left-value money-value" id="budget-left">₡0.00</div>
+                        <div class="budget-equation" id="budget-equation"></div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="summary-label">Where Your Income Goes</div>
+                        <div class="budget-plan-bar" id="budget-plan-bar"></div>
+                        <div class="budget-plan-legend" id="budget-plan-legend"></div>
+                        <p class="field-hint" id="budget-plan-note"></p>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Card Debt This Month</h3>
+                    <div id="budget-debt-list"></div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Income <span class="section-caption" id="budget-income-caption"></span></h3>
+                    <div id="income-entries-list"></div>
+                    <div class="budget-settings-row">
+                        <div class="form-group">
+                            <label>Expected Monthly Income (₡)</label>
+                            <input type="number" id="budget-expected-income" class="input money-value" min="0" step="1000" placeholder="e.g. 1500000">
+                        </div>
+                        <div class="form-group">
+                            <label>USD → CRC Rate</label>
+                            <input type="number" id="budget-usd-rate" class="input" min="1" step="0.01">
+                        </div>
+                        <button class="btn btn-secondary" onclick="saveBudgetSettings()">Save</button>
+                    </div>
+                    <p class="field-hint">Budgets are calculated from your expected income, so they don't shrink while you're waiting for your second payment. If you log more than expected (e.g. a bonus), the extra is included. USD purchases and payments are converted at this rate.</p>
+                </div>
+
+                <div class="settings-section">
+                    <div class="budget-section-header">
+                        <h3>Category Budgets</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="resetBudgetsToSuggested()">Reset to Suggested</button>
+                    </div>
+                    <p class="field-hint">Type a % or a ₡ amount - the app fills in the other. A highlighted field is the one you set: a % budget grows or shrinks with your income, and a ₡ amount stays fixed (good for rent).
+                        To make room for card debt, every budget without a 🔒 shrinks by the same % (shown in orange); 🔒 budgets are never reduced.</p>
+                    <div id="budget-lines" class="budget-lines">
+                        <p class="loading">Loading...</p>
+                    </div>
+                    <div class="budget-add-row">
+                        <select id="budget-add-category" class="input"></select>
+                        <button class="btn btn-secondary" onclick="addBudgetCategory()">+ Add Budget</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- View: Cards -->
             <div id="view-cards" class="view">
                 <div class="view-header">
@@ -138,6 +209,10 @@
                 <div class="view-header">
                     <h2>Transactions</h2>
                     <div class="view-header-actions">
+                        <div class="segmented" role="group" aria-label="Which transactions to show">
+                            <button id="tx-scope-today" class="active" onclick="setTransactionsScope(false)" title="Hide future-dated transactions, like upcoming Tasa Cero cuotas">Until Today</button>
+                            <button id="tx-scope-all" onclick="setTransactionsScope(true)" title="Include upcoming transactions">All (incl. Upcoming)</button>
+                        </div>
                         <button class="btn btn-secondary" onclick="showInstallmentPlanModal()">
                             <span>+ Tasa Cero</span>
                         </button>
@@ -198,6 +273,7 @@
                     <h2>Analytics</h2>
                 </div>
 
+
                 <div class="filters-panel">
                     <div class="filter-group">
                         <label>Quick Range</label>
@@ -251,6 +327,35 @@
                         <h3>Spending by Card</h3>
                         <div id="chart-card-utilization"></div>
                     </div>
+                </div>
+
+            </div>
+
+            <!-- View: Forecast -->
+            <div id="view-forecast" class="view">
+                <div class="view-header">
+                    <h2>Forecast <span class="section-caption" id="forecast-caption"></span></h2>
+                </div>
+
+                <div class="settings-section forecast-section">
+                    <div class="forecast-top">
+                        <div>
+                            <div class="budget-left-value money-value" id="forecast-left">₡0</div>
+                            <p class="forecast-sentence" id="forecast-sentence"></p>
+                        </div>
+                        <div class="budget-equation" id="forecast-equation"></div>
+                    </div>
+
+                    <div class="forecast-confidence" id="forecast-confidence"></div>
+
+                    <div class="forecast-legend">
+                        <span><span class="forecast-swatch forecast-spent"></span>Spent so far</span>
+                        <span><span class="forecast-swatch forecast-rest"></span>Expected rest of month</span>
+                        <span><span class="forecast-swatch forecast-cuotas"></span>Tasa Cero cuotas</span>
+                        <span><span class="forecast-swatch forecast-tick-swatch"></span>Budget</span>
+                        <span class="forecast-legend-hint">Click a category to see how it's calculated.</span>
+                    </div>
+                    <div id="forecast-lines" class="forecast-lines"></div>
                 </div>
             </div>
 
@@ -522,6 +627,117 @@
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">Save</button>
                         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Income Modal -->
+    <div id="modal-income" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Payment</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="income-form" onsubmit="saveIncome(event)">
+                    <div class="form-group">
+                        <label>Date Received</label>
+                        <input type="date" id="income-date" class="input" required>
+                        <p class="field-hint">Counts toward the budget for this date's month.</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" id="income-amount" class="input" step="0.01" min="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Currency</label>
+                        <select id="income-currency" class="input">
+                            <option value="CRC">CRC</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="income-description" class="input" placeholder="e.g. 1st payment">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card Payoff Plan Modal -->
+    <div id="modal-payoff" class="modal" style="display: none;">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <h3 id="payoff-modal-title">Payoff Plan</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="payoff-form" onsubmit="savePayoffPlan(event)">
+                    <p class="field-hint" style="margin-bottom: 16px;">
+                        Enter what you owe from your bank's app or statement. Colones and dollars are separate balances, each paid in its own currency.
+                        <strong>Interest rate</strong> is the annual rate on your statement ("tasa de interés corriente") - with it at 0 the estimate will be too optimistic.
+                        New spending defaults to your recent average on this card - lower it to see what cutting back does.
+                        Your first payment counts in the "as of" month.
+                    </p>
+                    <div class="form-group">
+                        <label>Balances As Of</label>
+                        <input type="date" id="payoff-as-of" class="input payoff-as-of" required oninput="renderPayoffProjection()">
+                    </div>
+                    <div class="payoff-columns">
+                        <div class="payoff-col">
+                            <h4>CRC</h4>
+                            <div class="form-group">
+                                <label>Amount Owed (₡)</label>
+                                <input type="number" id="payoff-balance-crc" class="input money-value" min="0" step="0.01" value="0" oninput="renderPayoffProjection()">
+                            </div>
+                            <div class="form-group">
+                                <label>Interest Rate (% per year)</label>
+                                <input type="number" id="payoff-rate-crc" class="input" min="0" max="200" step="0.01" value="0" oninput="renderPayoffProjection()">
+                            </div>
+                            <div class="form-group">
+                                <label>I'll Pay per Month (₡)</label>
+                                <input type="number" id="payoff-payment-crc" class="input money-value" min="0" step="0.01" value="0" oninput="renderPayoffProjection()">
+                            </div>
+                            <div class="form-group">
+                                <label>New Spending per Month (₡)</label>
+                                <input type="number" id="payoff-spend-crc" class="input money-value" min="0" step="0.01" oninput="renderPayoffProjection()">
+                                <p class="field-hint" id="payoff-spend-hint-crc"></p>
+                            </div>
+                            <div id="payoff-result-crc" class="payoff-result"></div>
+                        </div>
+                        <div class="payoff-col">
+                            <h4>USD</h4>
+                            <div class="form-group">
+                                <label>Amount Owed ($)</label>
+                                <input type="number" id="payoff-balance-usd" class="input money-value" min="0" step="0.01" value="0" oninput="renderPayoffProjection()">
+                            </div>
+                            <div class="form-group">
+                                <label>Interest Rate (% per year)</label>
+                                <input type="number" id="payoff-rate-usd" class="input" min="0" max="200" step="0.01" value="0" oninput="renderPayoffProjection()">
+                            </div>
+                            <div class="form-group">
+                                <label>I'll Pay per Month ($)</label>
+                                <input type="number" id="payoff-payment-usd" class="input money-value" min="0" step="0.01" value="0" oninput="renderPayoffProjection()">
+                            </div>
+                            <div class="form-group">
+                                <label>New Spending per Month ($)</label>
+                                <input type="number" id="payoff-spend-usd" class="input money-value" min="0" step="0.01" oninput="renderPayoffProjection()">
+                                <p class="field-hint" id="payoff-spend-hint-usd"></p>
+                            </div>
+                            <div id="payoff-result-usd" class="payoff-result"></div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Plan</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                        <button type="button" class="btn btn-danger" id="payoff-delete-btn" onclick="deletePayoffPlan()">Delete Plan</button>
                     </div>
                 </form>
             </div>

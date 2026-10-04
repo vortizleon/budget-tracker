@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from . import models, schemas, crud, analytics
+from . import models, schemas, crud, analytics, budgets, payoff, forecast
 from .database import get_db, init_db
 from .sync import TransactionSyncer
 
@@ -47,10 +47,20 @@ async def startup_event():
     init_db()
 
 
+# Each sidebar view has its own URL (/budgets, /analytics, ...) so reloading
+# or sharing a link keeps you on that view - they all serve the same page and
+# app.js picks the view from the path. Keep in sync with VIEWS in app.js.
+SPA_VIEWS = ["budgets", "transactions", "analytics", "forecast", "categories", "cards", "settings"]
+
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     """Serve the main SPA page."""
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+for _view in SPA_VIEWS:
+    app.add_api_route(f"/{_view}", read_root, methods=["GET"], response_class=HTMLResponse, include_in_schema=False)
 
 
 @app.get("/health")
@@ -556,6 +566,12 @@ async def get_card_utilization(db: Session = Depends(get_db)):
     return analytics.get_card_utilization(db)
 
 
+@app.get("/api/analytics/month-forecast", response_model=schemas.MonthForecast)
+async def get_month_forecast(db: Session = Depends(get_db)):
+    """Projected month-end spending per category at the current pace."""
+    return forecast.get_month_forecast(db)
+
+
 @app.get("/api/analytics/dashboard-summary", response_model=schemas.DashboardSummary)
 async def get_dashboard_summary(db: Session = Depends(get_db)):
     """Get dashboard summary statistics."""
@@ -619,6 +635,79 @@ async def delete_installment_plan(plan_id: int, db: Session = Depends(get_db)):
 
 
 # ============================================================================
+# Budget & Income Endpoints
+# ============================================================================
+
+def _check_month(month: Optional[str]) -> None:
+    try:
+        budgets.parse_month(month)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="month must be YYYY-MM")
+
+
+@app.get("/api/budgets", response_model=schemas.BudgetOverview)
+async def get_budget_overview(month: Optional[str] = None, db: Session = Depends(get_db)):
+    """Budgets, income and spending for a month ("YYYY-MM", default: current).
+    The first call ever also seeds the suggested budgets."""
+    _check_month(month)
+    return budgets.get_overview(db, month)
+
+
+@app.put("/api/budgets")
+async def upsert_budget(data: schemas.BudgetUpsert, db: Session = Depends(get_db)):
+    """Create or update a category's budget (by % of income or fixed amount)."""
+    try:
+        budget = budgets.upsert_budget(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"id": budget.id}
+
+
+@app.patch("/api/budgets/{budget_id}", status_code=204)
+async def set_budget_protected(budget_id: int, data: schemas.BudgetProtectedUpdate, db: Session = Depends(get_db)):
+    """Lock/unlock a budget against being reduced for debt payments."""
+    if not budgets.set_protected(db, budget_id, data.is_protected):
+        raise HTTPException(status_code=404, detail="Budget not found")
+
+
+@app.delete("/api/budgets/{budget_id}", status_code=204)
+async def delete_budget(budget_id: int, db: Session = Depends(get_db)):
+    """Remove a category's budget."""
+    if not budgets.delete_budget(db, budget_id):
+        raise HTTPException(status_code=404, detail="Budget not found")
+
+
+@app.post("/api/budgets/reset-suggested")
+async def reset_budgets_to_suggested(db: Session = Depends(get_db)):
+    """Replace all budgets with the suggested starting percentages."""
+    return {"budgets": budgets.reset_to_suggested(db)}
+
+
+@app.put("/api/budget-settings", response_model=schemas.BudgetSettingsResponse)
+async def update_budget_settings(update: schemas.BudgetSettingsUpdate, db: Session = Depends(get_db)):
+    """Update expected monthly income and/or the USD->CRC rate."""
+    return budgets.update_settings(db, update)
+
+
+@app.post("/api/income", response_model=schemas.IncomeEntryResponse, status_code=201)
+async def create_income(data: schemas.IncomeEntryCreate, db: Session = Depends(get_db)):
+    """Log a received payment."""
+    try:
+        return budgets.create_income(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/income/{income_id}", status_code=204)
+async def delete_income(income_id: int, db: Session = Depends(get_db)):
+    """Delete a logged payment."""
+    if not budgets.delete_income(db, income_id):
+        raise HTTPException(status_code=404, detail="Income entry not found")
+
+
+# ============================================================================
 # Card Billing Cycle Endpoints
 # ============================================================================
 
@@ -631,6 +720,33 @@ async def get_card_billing_cycles(card_id: int, db: Session = Depends(get_db)):
     if not card.cutoff_day:
         raise HTTPException(status_code=400, detail="Card has no cutoff day set")
     return crud.get_card_billing_cycles(db, card_id, card.cutoff_day)
+
+
+@app.get("/api/cards/{card_id}/payoff-plan", response_model=schemas.CardPayoffPlanResponse)
+async def get_card_payoff_plan(card_id: int, db: Session = Depends(get_db)):
+    """A card's saved payoff plan (if any) and its recent monthly spend."""
+    if not crud.get_card(db, card_id):
+        raise HTTPException(status_code=404, detail="Card not found")
+    return payoff.get_plan(db, card_id)
+
+
+@app.put("/api/cards/{card_id}/payoff-plan", response_model=schemas.CardPayoffPlanResponse)
+async def save_card_payoff_plan(
+    card_id: int,
+    data: schemas.CardPayoffPlanUpdate,
+    db: Session = Depends(get_db)
+):
+    """Create or replace a card's payoff plan."""
+    if not crud.get_card(db, card_id):
+        raise HTTPException(status_code=404, detail="Card not found")
+    return payoff.save_plan(db, card_id, data)
+
+
+@app.delete("/api/cards/{card_id}/payoff-plan", status_code=204)
+async def delete_card_payoff_plan(card_id: int, db: Session = Depends(get_db)):
+    """Delete a card's payoff plan."""
+    if not payoff.delete_plan(db, card_id):
+        raise HTTPException(status_code=404, detail="Payoff plan not found")
 
 
 # ============================================================================
