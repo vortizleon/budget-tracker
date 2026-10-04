@@ -18,7 +18,7 @@ A simple app that automatically imports bank receipts from Gmail and helps manag
 
 ## Using the `finance-app` CLI
 
-Once set up (see below), everything day-to-day goes through the `finance-app` command. It's installed on PATH (symlinked to `./finance-app` in this directory), so it works from anywhere.
+Once set up (see below), everything day-to-day goes through the `finance-app` command. It's installed on PATH (symlinked from `~/.local/bin/finance-app`), so it works from anywhere. Not a terminal person? Double-click `Abrir.command` (or the "Budget Tracker" shortcut the installer puts on your Desktop) to start the app and open the dashboard.
 
 | Command | What it does |
 |---|---|
@@ -67,11 +67,14 @@ A reasonable routine: `finance-app sync` weekly, `finance-app report` on the 1st
 For working on the code itself. (If you just want to run the app, use `Instalar.command` instead — see above.)
 
 ```bash
-# Create virtual environment (Python 3.13)
-python3.13 -m venv venv
+# Install uv (https://docs.astral.sh/uv/) - no Homebrew/Xcode needed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment (uv downloads Python 3.13 if you don't have it)
+uv venv --python 3.13 venv
 
 # Install packages
-venv/bin/pip install -r requirements.txt
+uv pip install --python venv/bin/python -r requirements.txt
 ```
 
 **Gmail API setup:** each person who runs this app needs their own Google Cloud project with the Gmail API enabled and a `credentials.json` downloaded to the project root — see the "Configura tu proyecto de Google" section in [GUIA_DE_USO.md](GUIA_DE_USO.md) for the exact steps (it's in Spanish, but the Google Cloud Console click-path is the same regardless).
@@ -101,14 +104,14 @@ Interactive menu:
 **Symlink the CLI and run it** (what `Instalar.command` does for non-developers):
 
 ```bash
-ln -sf "$(pwd)/finance-app" "$(brew --prefix)/bin/finance-app"
+mkdir -p ~/.local/bin && ln -sf "$(pwd)/finance-app" ~/.local/bin/finance-app
 finance-app        # open the dashboard at http://localhost:8000 - add cards there, then click "Sync Now"
 finance-app sync   # equivalent from the terminal; first run triggers the Gmail OAuth flow in the browser
 ```
 
 Every day-to-day CLI command also has a UI equivalent in the Settings tab (Sync Now, date-range sync, re-apply category rules, reconnect Gmail) — use whichever you prefer, they call the same backend logic.
 
-Or run the server directly without the CLI: `venv/bin/uvicorn backend.api:app --reload --host 0.0.0.0 --port 8000`.
+Or run the server directly without the CLI: `venv/bin/uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000`.
 
 ---
 
@@ -165,7 +168,8 @@ Your bank emails might have different format. To customize:
 
 ```
 budgeting-app/
-├── Instalar.command         # Double-click installer for non-developer users (macOS)
+├── Instalar.command         # Double-click installer for non-developer users (macOS, installs uv + Python, no Homebrew/Xcode)
+├── Abrir.command            # Double-click launcher: starts the server and opens the dashboard (no CLI needed)
 ├── GUIA_DE_USO.md           # Spanish-language setup + usage guide, for friends
 ├── finance-app               # CLI wrapper -> backend/manage.py (symlinked onto PATH)
 ├── backend/

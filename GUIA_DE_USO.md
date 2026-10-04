@@ -2,12 +2,23 @@
 
 ## 1. Descargar la app
 
-1. Haz click aca para descargar el ZIP: https://github.com/vortizleon/budget-tracker/archive/refs/heads/main.zip
-3. Busca el archivo `budget-tracker-main.zip` en tu carpeta de **Descargas**
-   y haz doble clic para descomprimirlo.
-4. Mueve la carpeta `budget-tracker-main` a donde prefieras tenerla de forma
-   permanente (por ejemplo, tu carpeta de **Documentos**). Puedes renombrarla
-   si quieres, por ejemplo a `budget-tracker`.
+**Opción A (recomendada, sin avisos de seguridad de Mac):** abre la app
+**Terminal** (búscala con Cmd+Espacio) y pega esto, luego Enter:
+
+```
+mkdir -p ~/Documents && curl -L https://github.com/vortizleon/budget-tracker/archive/refs/heads/main.tar.gz | tar -xz -C ~/Documents && mv ~/Documents/budget-tracker-main ~/Documents/budget-tracker
+```
+
+La app queda en `Documents/budget-tracker`. (Los archivos bajados así no
+llevan la marca de "descargado de internet" que hace que Mac los bloquee.)
+
+**Opción B (ZIP desde el navegador):**
+
+1. Descarga el ZIP: https://github.com/vortizleon/budget-tracker/archive/refs/heads/main.zip
+2. Busca `budget-tracker-main.zip` en **Descargas** y haz doble clic para
+   descomprimirlo.
+3. Mueve la carpeta `budget-tracker-main` a donde prefieras tenerla de forma
+   permanente (por ejemplo, **Documentos**).
 
 ---
 
@@ -15,13 +26,15 @@
 
 1. Abre esa carpeta y busca el archivo **`Instalar.command`**.
 2. Haz doble clic en él.
-3. Si tu Mac muestra un aviso de que no puede abrirlo porque es de un
-   "desarrollador no identificado" (es porque no soy ningun big corp): haz **clic derecho** sobre
-   `Instalar.command` → **Abrir** → y confirma **Abrir** en la ventana que
-   aparece. Esto solo hay que hacerlo la primera vez.
-4. Se abre una ventana de Terminal y el instalador empieza a trabajar solo:
-   instala lo que haga falta (puede pedirte tu contraseña de Mac — es
-   normal, no se ve mientras escribes, todo es LOCAL en tu computadora) y prepara la app.
+3. Si bajaste el ZIP (Opción B) y tu Mac muestra un aviso de que no puede
+   abrirlo porque es de un "desarrollador no identificado" (es porque no soy
+   ningun big corp): haz **clic derecho** sobre `Instalar.command` →
+   **Abrir** → y confirma **Abrir**. Solo la primera vez. (Alternativa: en
+   Terminal, `bash ~/Documents/budget-tracker/Instalar.command`.)
+4. Se abre una ventana de Terminal y el instalador trabaja solo. Instala
+   `uv` (que a su vez baja Python) y los componentes de la app. **No pide
+   contraseña, no necesita Homebrew ni las herramientas de Xcode, y no
+   requiere actualizar macOS.** Todo es LOCAL en tu computadora.
 5. En algún momento el instalador se va a detener y decirte que falta el
    archivo `credentials.json`. Es normal — eso es lo que haces en el
    siguiente paso. Deja esa ventana abierta o ciérrala, no pasa nada; cuando
@@ -110,6 +123,10 @@ manda* los avisos — no tu propio correo.
 
 ## 5. Primera sincronización
 
+> **Abrir la app después:** haz doble clic en **"Budget Tracker"** en tu
+> Escritorio (o en `Abrir.command` dentro de la carpeta). No necesitas la
+> Terminal. Si reiniciaste la Mac, solo vuelve a abrirla así.
+
 En la pestaña **Settings**, en la sección **Sync Status**, haz clic en el
 botón **Sync Now**.
 
@@ -160,7 +177,9 @@ completa de comandos.
 **"Mac dice que no puede abrir Instalar.command porque es de un desarrollador
 no identificado"**
 Clic derecho sobre el archivo → Abrir → confirmar Abrir. Solo pasa la
-primera vez.
+primera vez, y solo si bajaste el ZIP. Con la Opción A de la sección 1 no
+aparece. Después de correr el instalador, `Abrir.command` y el acceso
+directo del Escritorio ya no dan este aviso.
 
 **"Google dice que la app no está verificada / no es segura"**
 Es normal y esperado — hiciste tu propio proyecto solo para ti en el paso 3,

@@ -30,49 +30,49 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
-# --- Homebrew ---
-if ! command -v brew >/dev/null 2>&1; then
-  info "No tienes Homebrew instalado (es el instalador de programas que vamos a usar). Instalándolo..."
-  info "Te va a pedir tu contraseña de Mac - es normal, escríbela y da Enter (no se ve mientras escribes)."
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  if [[ -x /opt/homebrew/bin/brew ]]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
-  elif [[ -x /usr/local/bin/brew ]]; then
-    eval "$(/usr/local/bin/brew shellenv)"
+# --- Quitar la marca de "descargado de internet" ---
+# macOS marca todo lo que baja de internet (zip, AirDrop) y bloquea doble clic
+# en los .command. Como este script ya está corriendo, limpiamos la carpeta
+# para que Abrir.command y el resto funcionen sin avisos. No requiere sudo.
+xattr -dr com.apple.quarantine "$DIR" 2>/dev/null || true
+chmod +x "$DIR/Abrir.command" "$DIR/finance-app" 2>/dev/null || true
+
+# --- uv (instala Python por nosotros; sin Homebrew, sin Xcode, sin sudo) ---
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+if ! command -v uv >/dev/null 2>&1; then
+  info "Instalando 'uv' (un instalador de Python liviano, no necesita contraseña ni Xcode)..."
+  if ! curl -LsSf https://astral.sh/uv/install.sh | sh; then
+    err "No se pudo descargar uv. Revisa tu conexión a internet y vuelve a intentar."
+    read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
+    exit 1
   fi
-  if ! command -v brew >/dev/null 2>&1; then
-    err "Homebrew no quedó instalado correctamente. Cierra esta ventana, abre una Terminal nueva y vuelve a hacer doble clic en este archivo."
+  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+  if ! command -v uv >/dev/null 2>&1; then
+    err "uv no quedó instalado correctamente. Avísale a quien te compartió la app."
     read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
     exit 1
   fi
 else
-  ok "Homebrew ya está instalado."
+  ok "uv ya está instalado."
 fi
 
-# --- Python 3.13 ---
-if ! brew list python@3.13 >/dev/null 2>&1; then
-  info "Instalando Python 3.13..."
-  brew install python@3.13
-else
-  ok "Python 3.13 ya está instalado."
-fi
-PYTHON_BIN="$(brew --prefix python@3.13)/bin/python3.13"
-if [[ ! -x "$PYTHON_BIN" ]]; then
-  err "No se encontró Python 3.13 después de instalarlo. Avísale a quien te compartió la app."
-  read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
-  exit 1
-fi
-
-# --- Entorno virtual + dependencias ---
-if [[ ! -d "venv" ]]; then
-  info "Creando el entorno de la app..."
-  "$PYTHON_BIN" -m venv venv
+# --- Entorno virtual (Python 3.13 descargado por uv) + dependencias ---
+if [[ ! -x "venv/bin/python" ]]; then
+  info "Creando el entorno de la app (descarga Python la primera vez)..."
+  if ! uv venv --python 3.13 venv; then
+    err "No se pudo crear el entorno. Avísale a quien te compartió la app."
+    read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
+    exit 1
+  fi
   ok "Entorno creado."
 fi
 
 info "Instalando los componentes necesarios (esto puede tardar un par de minutos)..."
-venv/bin/pip install -q --upgrade pip
-venv/bin/pip install -q -r requirements.txt
+if ! uv pip install -q --python venv/bin/python -r requirements.txt; then
+  err "Falló la instalación de componentes. Avísale a quien te compartió la app."
+  read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
+  exit 1
+fi
 ok "Componentes instalados."
 echo ""
 
@@ -99,14 +99,22 @@ fi
 ok "credentials.json encontrado."
 echo ""
 
-# --- Symlink de finance-app al PATH ---
-BREW_BIN="$(brew --prefix)/bin"
-if [[ ! -L "$BREW_BIN/finance-app" || "$(readlink "$BREW_BIN/finance-app")" != "$DIR/finance-app" ]]; then
-  chmod +x "$DIR/finance-app"
-  ln -sf "$DIR/finance-app" "$BREW_BIN/finance-app"
-  ok "Comando 'finance-app' instalado."
+# --- Comando 'finance-app' (opcional, para quien use Terminal) ---
+BIN_DIR="$HOME/.local/bin"
+mkdir -p "$BIN_DIR"
+ln -sf "$DIR/finance-app" "$BIN_DIR/finance-app"
+if ! grep -qs '\.local/bin' "$HOME/.zprofile" 2>/dev/null; then
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zprofile"
+fi
+ok "Comando 'finance-app' instalado (disponible en Terminales nuevas)."
+
+# --- Acceso directo en el Escritorio (para abrir la app con doble clic) ---
+LAUNCHER="$HOME/Desktop/Budget Tracker.command"
+if printf '#!/usr/bin/env bash\nexec "%s/Abrir.command"\n' "$DIR" > "$LAUNCHER" 2>/dev/null; then
+  chmod +x "$LAUNCHER"
+  ok "Acceso directo creado en el Escritorio: 'Budget Tracker'."
 else
-  ok "Comando 'finance-app' ya estaba instalado."
+  info "No se pudo crear el acceso directo en el Escritorio; usa Abrir.command en la carpeta de la app."
 fi
 echo ""
 
@@ -120,7 +128,7 @@ echo ""
 
 # --- Abrir el panel para que agregues tus tarjetas desde ahí ---
 info "Abriendo el panel de la app en tu navegador..."
-"$DIR/finance-app"
+"$DIR/venv/bin/python" "$DIR/backend/manage.py" open
 
 echo ""
 echo "========================================"
@@ -136,6 +144,9 @@ echo "  2. ¿Bancos distintos a BAC/Promerica? Agrégalos en 'Settings' ->"
 echo "     '+ Add Email Source' (BAC y Promerica ya quedaron listos)."
 echo "  3. Clic en 'Sync Now' (está en la pestaña 'Settings') para traer"
 echo "     tus transacciones de Gmail por primera vez."
+echo ""
+echo "La próxima vez, abre la app con doble clic en 'Budget Tracker'"
+echo "(en tu Escritorio) o en Abrir.command. No necesitas la Terminal."
 echo ""
 echo "Revisa la GUIA_DE_USO.md para el detalle de cada paso."
 echo ""
