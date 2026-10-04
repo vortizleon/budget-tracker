@@ -233,10 +233,12 @@ error) y mándaselo a quien te compartió la app. También puede ser que otro
 programa esté usando el puerto 8000.
 
 **Quiero actualizar a una versión nueva**
-Baja la versión nueva (el comando de la sección 1, tras renombrar la carpeta
-vieja) en una carpeta nueva y copia a la nueva carpeta tus archivos `credentials.json`,
-`token.json` y `budgeting.db` (son tus datos). Luego haz doble clic en
-`Instalar.command` de la carpeta nueva.
+Haz doble clic en **`Actualizar.command`** (en la carpeta de la app). Baja la
+última versión y la copia encima, **sin tocar tus datos** (tarjetas,
+transacciones, `credentials.json`, `token.json`). Antes de actualizar guarda
+una copia de tu base de datos en la carpeta `backups/`. Si la app estaba
+abierta, la reinicia sola. También puedes correr `finance-app update` en la
+Terminal.
 
 **"Google dice que la app no está verificada / no es segura"**
 Es normal y esperado — hiciste tu propio proyecto solo para ti en el paso 3,
