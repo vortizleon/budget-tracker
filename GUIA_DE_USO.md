@@ -41,13 +41,22 @@ iniciar sesión primero).
 
 1. Crea el proyecto: entra a
    **https://console.cloud.google.com/projectcreate**
-   Ponle un nombre, por ejemplo `Budget Tracker`, y clic en **Crear**.
-   Espera unos segundos y asegúrate de que ese proyecto quede seleccionado
-   en el selector de proyectos (arriba a la izquierda). Si tienes más de uno,
-   revisa que diga "Budget Tracker" y no otro.
+   - **Nombre del proyecto:** `Budget Tracker` (o el que quieras).
+   - **Recurso superior / Ubicación:** déjalo en **Sin organización**.
+   - Clic en **Crear**.
+
+   Te lleva al panel de Google Cloud ("Vista general de Cloud"). **Ignora
+   todo lo que aparece ahí**: el banner de "Comienza tu prueba gratuita" y
+   el botón **Comenzar gratis** (no necesitas facturación ni tarjeta; Gmail
+   API es gratis) y el aviso de "Cloud Hub". Solo confirma que arriba, junto
+   al logo de Google Cloud, aparezca el nombre de tu proyecto. Si tienes
+   más de un proyecto, revisa que sea ese y no otro.
 2. Habilita Gmail API: con el proyecto seleccionado, entra a
    **https://console.cloud.google.com/apis/library/gmail.googleapis.com**
-   y haz clic en **Habilitar** (Enable).
+   y haz clic en el botón azul **Habilitar** (Enable). Espera unos segundos:
+   cuando termine, la página "Detalles del servicio o la API" muestra
+   **Estado: Habilitada**. **No** hagas clic todavía en el botón
+   "Crear credenciales" que aparece arriba; primero va el paso 3.
 3. Configura Google Auth Platform (antes llamada "pantalla de consentimiento
    de OAuth"): entra a **https://console.cloud.google.com/auth/overview** y
    haz clic en **Comenzar** (Get started). Es un asistente de 4 pantallas:
