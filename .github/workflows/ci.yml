@@ -1,0 +1,64 @@
+name: CI
+
+# Installs the app from scratch (like a new user) and checks it starts and serves
+# every page. A missing dependency, like the `jinja2` one that broke a friend's
+# install, fails here instead of on their computer.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Clean install + tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Create venv with Python 3.13 (same as the installer)
+        run: uv venv --python 3.13 venv
+
+      - name: Install exactly what a user gets, plus test tools
+        run: uv pip install --python venv/bin/python -r requirements.txt -r requirements-dev.txt
+
+      - name: Tests (imports, every page, credentials upload/auto-detect)
+        run: venv/bin/python -m pytest tests -q
+
+      - name: Real server starts and answers
+        run: |
+          venv/bin/python -m uvicorn backend.api:app --port 8000 &
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:8000/health && break; sleep 1; done
+          curl -fs -o /dev/null http://127.0.0.1:8000/
+          curl -fs http://127.0.0.1:8000/api/cards
+
+      - name: Shell scripts have valid syntax
+        run: |
+          for f in *.command finance-app; do bash -n "$f" && echo "ok $f"; done
+
+  installer-macos:
+    name: Instalar.command on a clean Mac
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # No credentials.json on purpose: a new user installs first and uploads the
+      # Google file from the Settings page afterwards.
+      - name: Run the installer (stdin closed, no credentials.json)
+        run: bash ./Instalar.command </dev/null
+
+      - name: Installed app imports, CLI link exists, and the dashboard is up
+        run: |
+          venv/bin/python -c "import backend.api, backend.manage; print('imports ok')"
+          test -L "$HOME/.local/bin/finance-app"
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:8000/health && break; sleep 1; done
+          curl -fs http://127.0.0.1:8000/api/settings/credentials

@@ -136,6 +136,12 @@ Or run the server directly without the CLI: `venv/bin/uvicorn backend.api:app --
 
 ---
 
+## Tests / CI
+
+`requirements-dev.txt` adds `pytest` and `httpx`. Run `venv/bin/python -m pytest tests` - it checks that every module imports, every page is served and the Google credentials upload/auto-detect works, all against a throwaway database. GitHub Actions (`.github/workflows/ci.yml`) repeats a clean install on Linux and macOS for every PR, and also runs `Instalar.command` on a clean Mac.
+
+---
+
 ## Database Schema
 
 ### Cards
