@@ -21,8 +21,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
 
       - name: Create venv with Python 3.13 (same as the installer)
         run: uv venv --python 3.13 venv
@@ -49,7 +49,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # No credentials.json on purpose: a new user installs first and uploads the
       # Google file from the Settings page afterwards.
