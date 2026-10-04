@@ -66,7 +66,12 @@ iniciar sesión primero).
      marca error en rojo). Clic en **Siguiente**.
 
      ![Paso 1 del asistente: Información de la app](docs/img/google-auth-1-info-app.webp)
-   - **Público (Audience):** elige **Externo** (External) → Siguiente.
+   - **Público:** elige **Usuarios externos** (no "Interno"; "Interno" solo
+     sirve para cuentas de empresa/organización de Google). Dice que tu app
+     "se iniciará en modo de prueba": es lo que queremos. Clic en
+     **Siguiente**.
+
+     ![Paso 2 del asistente: Público](docs/img/google-auth-2-publico.webp)
    - **Información de contacto:** tu correo → Siguiente.
    - **Finalizar:** marca la casilla de aceptar la política de datos de
      usuario → **Continuar** → **Crear**.
@@ -96,7 +101,7 @@ iniciar sesión primero).
 
 > **Nota:** Google cambia estas pantallas de vez en cuando. Si algo no se ve
 > igual, busca el equivalente por el nombre del botón; los pasos siempre son:
-> habilitar Gmail API → configurar la pantalla de consentimiento (Externo) →
+> habilitar Gmail API → configurar la pantalla de consentimiento (Usuarios externos) →
 > agregarte como usuario de prueba → crear un cliente de escritorio →
 > descargar el JSON.
 
