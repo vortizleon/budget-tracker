@@ -13,7 +13,7 @@ cd "$DIR"
 
 if [[ ! -x "venv/bin/python" ]]; then
   echo "✗ La app todavía no está instalada. Haz doble clic en Instalar.command primero."
-  read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
+  read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..." || true
   exit 1
 fi
 
