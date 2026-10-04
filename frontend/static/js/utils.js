@@ -15,6 +15,27 @@ function ordinalSuffix(day) {
 }
 
 /**
+ * Set a button's label without replacing its text node (textContent = ... would,
+ * and the translator keeps a reference to the original node to re-translate it).
+ * @param {HTMLElement} el
+ * @param {string} text
+ */
+function setLabel(el, text) {
+    const node = Array.from(el.childNodes).find(n => n.nodeType === Node.TEXT_NODE && n.nodeValue.trim());
+    if (node) node.nodeValue = text;
+    else el.textContent = text;
+}
+
+/**
+ * Day-of-month ordinal for display: "5th" in English, just "5" in Spanish ("el día 5").
+ * @param {number} day
+ * @returns {string}
+ */
+function dayOrdinal(day) {
+    return I18N.lang() === 'es' ? String(day) : `${day}${ordinalSuffix(day)}`;
+}
+
+/**
  * Format a number as currency
  * @param {number} amount - The amount to format
  * @param {string} currency - Currency code (CRC or USD)
@@ -22,7 +43,7 @@ function ordinalSuffix(day) {
  */
 function formatCurrency(amount, currency) {
     const absAmount = Math.abs(amount);
-    const formatted = absAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const formatted = absAmount.toLocaleString(I18N.locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     if (currency === 'CRC') {
         return `₡${formatted}`;
@@ -53,7 +74,7 @@ function formatDate(dateString, includeTime = false) {
         options.minute = '2-digit';
     }
 
-    return date.toLocaleDateString('en-US', options);
+    return date.toLocaleDateString(I18N.locale(), options);
 }
 
 /**
@@ -92,12 +113,12 @@ function getRelativeTime(dateString) {
     const diffMs = now - date;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return `${Math.floor(diffDays / 365)} years ago`;
+    if (diffDays === 0) return _t('Today');
+    if (diffDays === 1) return _t('Yesterday');
+    if (diffDays < 7) return _tp(diffDays, '{n} day ago', '{n} days ago');
+    if (diffDays < 30) return _tp(Math.floor(diffDays / 7), '{n} week ago', '{n} weeks ago');
+    if (diffDays < 365) return _tp(Math.floor(diffDays / 30), '{n} month ago', '{n} months ago');
+    return _tp(Math.floor(diffDays / 365), '{n} year ago', '{n} years ago');
 }
 
 /**

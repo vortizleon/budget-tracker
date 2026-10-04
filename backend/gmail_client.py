@@ -116,8 +116,8 @@ class GmailClient:
             else:
                 if not self.credentials_path.exists():
                     raise FileNotFoundError(
-                        f"No Google OAuth client file found. Upload it in Settings > Google credentials "
-                        f"(or put the .json from Google Cloud in {BASE_DIR})."
+                        "No Google OAuth client file found. Upload it in Settings > Google credentials "
+                        "(or put the .json from Google Cloud in the project folder)."
                     )
                 print("Starting OAuth flow...")
                 print("A browser window will open for authentication.")

@@ -205,6 +205,8 @@ diciendo cuántas transacciones nuevas encontró. ¡Ya está lista para usarse!
 
 ## 6. Uso del día a día
 
+**Idioma:** la app está en español e inglés. El botón **EN | ES** (arriba a la izquierda, junto al ícono de modo oscuro) cambia el idioma y recuerda la elección.
+
 **Abrir la app:** haz doble clic en **"Budget Tracker"** en tu Escritorio
 (o en `Abrir.command` dentro de la carpeta de la app). No necesitas la
 Terminal. Si reiniciaste la Mac, solo vuelve a abrirla así. La app corre
