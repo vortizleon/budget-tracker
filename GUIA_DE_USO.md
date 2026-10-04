@@ -1,45 +1,30 @@
 # Guía de uso — Budget Tracker
 
-## 1. Descargar la app
+## 1. Descargar e instalar
 
-**Opción A (recomendada, sin avisos de seguridad de Mac):** abre la app
-**Terminal** (búscala con Cmd+Espacio) y pega esto, luego Enter:
+1. Abre la app **Terminal** (Cmd+Espacio, escribe "Terminal", Enter).
+2. Pega este comando completo y presiona Enter:
 
 ```
-[ -e ~/Documents/budget-tracker ] && echo "Ya existe ~/Documents/budget-tracker (ya la descargaste)" || (mkdir -p ~/Documents && curl -L https://github.com/vortizleon/budget-tracker/archive/refs/heads/main.tar.gz | tar -xz -C ~/Documents && mv ~/Documents/budget-tracker-main ~/Documents/budget-tracker && echo "Listo: ~/Documents/budget-tracker")
+[ -d ~/Documents/budget-tracker ] || (mkdir -p ~/Documents && curl -fsSL https://github.com/vortizleon/budget-tracker/archive/refs/heads/main.tar.gz | tar -xz -C ~/Documents && mv ~/Documents/budget-tracker-main ~/Documents/budget-tracker); bash ~/Documents/budget-tracker/Instalar.command
 ```
 
-La app queda en `Documents/budget-tracker`. (Los archivos bajados así no
-llevan la marca de "descargado de internet" que hace que Mac los bloquee.)
-
-**Opción B (ZIP desde el navegador):**
-
-1. Descarga el ZIP: https://github.com/vortizleon/budget-tracker/archive/refs/heads/main.zip
-2. Busca `budget-tracker-main.zip` en **Descargas** y haz doble clic para
-   descomprimirlo.
-3. Mueve la carpeta `budget-tracker-main` a donde prefieras tenerla de forma
-   permanente (por ejemplo, **Documentos**).
+Eso descarga la app a `Documents/budget-tracker` y corre el instalador.
+Se usa Terminal (y no el ZIP del navegador) porque Mac bloquea los archivos
+descargados desde el navegador; así no aparece ningún aviso de seguridad.
 
 ---
 
-## 2. Ejecutar el instalador
+## 2. Qué esperar del instalador
 
-1. Abre esa carpeta y busca el archivo **`Instalar.command`**.
-2. Haz doble clic en él.
-3. Si bajaste el ZIP (Opción B) y tu Mac muestra un aviso de que no puede
-   abrirlo porque es de un "desarrollador no identificado" (es porque no soy
-   ningun big corp): haz **clic derecho** sobre `Instalar.command` →
-   **Abrir** → y confirma **Abrir**. Solo la primera vez. (Alternativa: en
-   Terminal, `bash ~/Documents/budget-tracker/Instalar.command`.)
-4. Se abre una ventana de Terminal y el instalador trabaja solo. Instala
-   `uv` (que a su vez baja Python) y los componentes de la app. **No pide
-   contraseña, no necesita Homebrew ni las herramientas de Xcode, y no
-   requiere actualizar macOS.** Todo es LOCAL en tu computadora.
-5. En algún momento el instalador se va a detener y decirte que falta el
-   archivo `credentials.json`. Es normal — eso es lo que haces en el
-   siguiente paso. Deja esa ventana abierta o ciérrala, no pasa nada; cuando
-   termines el paso 3 vuelves a hacer doble clic en `Instalar.command` y
-   sigue donde quedó.
+- Trabaja solo. Instala `uv` (que baja Python) y los componentes de la app.
+  **No pide contraseña, no necesita Homebrew ni las herramientas de Xcode, y
+  no requiere actualizar macOS.** Todo es LOCAL en tu computadora.
+- En algún momento se detiene y dice que falta el archivo `credentials.json`.
+  Es normal: eso es el siguiente paso (sección 3). Cierra la ventana.
+- Cuando tengas `credentials.json`, haz doble clic en `Instalar.command`
+  (en la carpeta `Documents/budget-tracker`) y sigue donde quedó. Es seguro
+  repetirlo las veces que haga falta.
 
 ---
 
@@ -89,8 +74,7 @@ iniciar sesión primero).
    `client_secret_123456.json`):
    - Renómbralo a exactamente: **`credentials.json`**
    - Muévelo a la carpeta de la app, justo al lado de `Instalar.command`.
-8. Vuelve al paso 2 de esta guía: haz doble clic en **`Instalar.command`**
-   otra vez.
+8. Vuelve a la sección 2: haz doble clic en **`Instalar.command`** otra vez.
 
 ---
 
@@ -179,8 +163,8 @@ completa de comandos.
 **"Mac dice que no puede abrir Instalar.command porque es de un desarrollador
 no identificado"**
 Clic derecho sobre el archivo → Abrir → confirmar Abrir. Solo pasa la
-primera vez, y solo si bajaste el ZIP. Con la Opción A de la sección 1 no
-aparece. Después de correr el instalador, `Abrir.command` y el acceso
+primera vez, y solo si bajaste el ZIP desde el navegador en vez de usar el comando de la
+sección 1. Después de correr el instalador, `Abrir.command` y el acceso
 directo del Escritorio ya no dan este aviso.
 
 **El instalador falló al descargar `uv` o Python**
@@ -202,8 +186,8 @@ error) y mándaselo a quien te compartió la app. También puede ser que otro
 programa esté usando el puerto 8000.
 
 **Quiero actualizar a una versión nueva**
-Baja la versión nueva con la Opción A o B de la sección 1 en una carpeta
-distinta y copia a la nueva carpeta tus archivos `credentials.json`,
+Baja la versión nueva (el comando de la sección 1, tras renombrar la carpeta
+vieja) en una carpeta nueva y copia a la nueva carpeta tus archivos `credentials.json`,
 `token.json` y `budgeting.db` (son tus datos). Luego haz doble clic en
 `Instalar.command` de la carpeta nueva.
 
