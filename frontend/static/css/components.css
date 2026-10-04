@@ -342,3 +342,30 @@
 .gap-sm { gap: var(--spacing-sm); }
 .gap-md { gap: var(--spacing-md); }
 .gap-lg { gap: var(--spacing-lg); }
+
+
+/* Settings: drag-and-drop file picker (Google credentials) */
+.dropzone {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    text-align: center;
+    padding: var(--spacing-lg, 24px);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.dropzone strong {
+    color: var(--text-primary);
+}
+
+.dropzone:hover,
+.dropzone.dragover {
+    border-color: var(--primary);
+    background: var(--bg-tertiary);
+}

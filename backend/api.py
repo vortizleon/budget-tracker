@@ -11,7 +11,9 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from . import models, schemas, crud, analytics, budgets, payoff, forecast
+from pydantic import BaseModel, Field
+
+from . import models, schemas, crud, analytics, budgets, payoff, forecast, gmail_client
 from .database import get_db, init_db
 from .sync import TransactionSyncer
 
@@ -899,6 +901,46 @@ async def recategorize_transactions(all: bool = False, db: Session = Depends(get
 
     db.commit()
     return {"checked": len(transactions), "updated": updated}
+
+
+class CredentialsUpload(BaseModel):
+    content: str = Field(..., max_length=50_000)
+
+
+@app.get("/api/settings/credentials")
+async def get_credentials_status():
+    """Whether the Google OAuth client file / Gmail login are in place."""
+    base = gmail_client.BASE_DIR
+    return {
+        "has_credentials": (base / gmail_client.CREDENTIALS_NAME).exists(),
+        "has_token": (base / "token.json").exists(),
+    }
+
+
+@app.post("/api/settings/credentials")
+async def upload_credentials(upload: CredentialsUpload):
+    """Save the Google OAuth client file uploaded from the Settings page as
+    credentials.json. Replacing it with a different client invalidates the
+    stored Gmail login, so token.json is removed and the next sync logs in again."""
+    try:
+        gmail_client.parse_client_json(upload.content)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    base = gmail_client.BASE_DIR
+    target = base / gmail_client.CREDENTIALS_NAME
+    token = base / "token.json"
+    previous = target.read_text() if target.exists() else None
+    tmp = target.with_suffix(".json.tmp")
+    tmp.write_text(upload.content)
+    tmp.chmod(0o600)
+    tmp.replace(target)
+
+    token_removed = False
+    if previous is not None and previous != upload.content and token.exists():
+        token.unlink()
+        token_removed = True
+    return {"saved": True, "replaced": previous is not None, "token_removed": token_removed}
 
 
 @app.post("/api/maintenance/reconnect-gmail")

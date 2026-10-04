@@ -22,13 +22,38 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 CREDENTIALS_NAME = "credentials.json"
 
 
-def _is_desktop_client_file(path: Path) -> bool:
-    """True if `path` is a Google OAuth *desktop* client file (has an "installed" key)."""
+def parse_client_json(text: str) -> dict:
+    """Validate the text of a Google OAuth *desktop* client file and return it.
+
+    Raises ValueError with a message that is safe to show to the user.
+    """
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(text)
+    except ValueError:
+        raise ValueError("That file isn't valid JSON. Use the .json file you downloaded from Google Cloud.")
+    if not isinstance(data, dict):
+        raise ValueError("That doesn't look like a Google OAuth client file.")
+    if "web" in data and "installed" not in data:
+        raise ValueError(
+            "This is a 'Web application' client. Create a 'Desktop app' client in Google Cloud "
+            "and download that file instead."
+        )
+    installed = data.get("installed")
+    if not isinstance(installed, dict) or not installed.get("client_id") or not installed.get("client_secret"):
+        raise ValueError(
+            "That doesn't look like a Google OAuth client file. "
+            "It should be the file named client_secret_....json that Google gives you."
+        )
+    return data
+
+
+def _is_desktop_client_file(path: Path) -> bool:
+    """True if `path` is a Google OAuth *desktop* client file."""
+    try:
+        parse_client_json(path.read_text())
     except (OSError, ValueError):
         return False
-    return isinstance(data, dict) and "installed" in data
+    return True
 
 
 def adopt_credentials(base_dir: Path = BASE_DIR) -> Optional[Path]:
@@ -91,8 +116,8 @@ class GmailClient:
             else:
                 if not self.credentials_path.exists():
                     raise FileNotFoundError(
-                        f"No Google OAuth client file found. Download it from Google Cloud "
-                        f"(Desktop app client) and put it in {BASE_DIR}."
+                        f"No Google OAuth client file found. Upload it in Settings > Google credentials "
+                        f"(or put the .json from Google Cloud in {BASE_DIR})."
                     )
                 print("Starting OAuth flow...")
                 print("A browser window will open for authentication.")
