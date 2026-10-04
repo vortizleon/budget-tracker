@@ -106,9 +106,10 @@ iniciar sesión primero).
    - Ponle el nombre que quieras → **Crear**.
    - No hace falta tocar "Acceso a los datos" (Data Access) ni agregar
      permisos: la app los pide sola al conectar Gmail.
-6. Te va a aparecer una ventana con tu ID de cliente — haz clic en **Descargar
-   JSON**. (Si la cerraste: en **Clientes**, clic en el nombre del cliente
-   que creaste → **Descargar JSON**.)
+6. Te va a aparecer una ventana con los datos de tu cliente — haz clic en
+   **Descargar JSON**. (Si la cerraste: en **Clientes**, clic en el nombre
+   del cliente que creaste → **Descargar JSON**.) Ese archivo es privado:
+   no lo compartas ni lo subas a ningún lado.
 7. Ve a tu carpeta de **Descargas** y busca ese archivo (algo como
    `client_secret_123456.json`). Muévelo a la carpeta de la app
    (`Documents/budget-tracker`), justo al lado de `Instalar.command`.
@@ -117,10 +118,10 @@ iniciar sesión primero).
 8. Vuelve a la sección 2: haz doble clic en **`Instalar.command`** otra vez.
 
 > **Nota:** Google cambia estas pantallas de vez en cuando. Si algo no se ve
-> igual, busca el equivalente por el nombre del botón; los pasos siempre son:
-> habilitar Gmail API → configurar la pantalla de consentimiento (Usuarios externos) →
-> agregarte como usuario de prueba → crear un cliente de escritorio →
-> descargar el JSON.
+> igual, busca el equivalente por el nombre del botón. Los pasos siempre son:
+> habilitar Gmail API → configurar la pantalla de consentimiento (Usuarios
+> externos) → agregarte como usuario de prueba → crear un cliente de
+> escritorio → descargar el JSON.
 
 ---
 
