@@ -388,9 +388,43 @@ def get_transaction(db: Session, transaction_id: int) -> Optional[models.Transac
     ).filter(models.Transaction.id == transaction_id).first()
 
 
+def match_category_rule(db: Session, commerce_name: Optional[str]) -> Optional[int]:
+    """Category of the first active categorization rule matching `commerce_name`
+    (highest priority first), same matching as the Gmail sync: '%x%' contains,
+    'x%' starts with, '%x' ends with, bare 'x' exact - all case-insensitive."""
+    if not commerce_name:
+        return None
+    name = commerce_name.strip().upper()
+    rules = db.query(models.CategorizationRule).filter(
+        models.CategorizationRule.is_active == True
+    ).order_by(models.CategorizationRule.priority.desc()).all()
+    for rule in rules:
+        pattern = rule.commerce_pattern.strip().upper()
+        if pattern.startswith('%') and pattern.endswith('%') and len(pattern) > 1:
+            if pattern[1:-1] in name:
+                return rule.category_id
+        elif pattern.endswith('%'):
+            if name.startswith(pattern[:-1]):
+                return rule.category_id
+        elif pattern.startswith('%'):
+            if name.endswith(pattern[1:]):
+                return rule.category_id
+        elif name == pattern:
+            return rule.category_id
+    return None
+
+
 def create_transaction(db: Session, transaction: schemas.TransactionCreate) -> models.Transaction:
-    """Create a new transaction."""
-    db_transaction = models.Transaction(**transaction.model_dump())
+    """Create a new transaction. With no category given it is picked the way synced
+    ones are: a matching categorization rule first, then the card's default category."""
+    data = transaction.model_dump()
+    if data.get("category_id") is None:
+        category_id = match_category_rule(db, data.get("commerce_name"))
+        if category_id is None and data.get("card_id") is not None:
+            card = db.query(models.Card).filter(models.Card.id == data["card_id"]).first()
+            category_id = card.default_category_id if card else None
+        data["category_id"] = category_id
+    db_transaction = models.Transaction(**data)
     db.add(db_transaction)
     db.commit()
     db.refresh(db_transaction)

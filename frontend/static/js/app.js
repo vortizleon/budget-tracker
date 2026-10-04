@@ -1159,6 +1159,68 @@ async function deleteTransaction(id) {
     }
 }
 
+// ---- Add a transaction by hand ----
+
+function showAddTransactionModal() {
+    document.getElementById('transaction-form').reset();
+    document.getElementById('tx-date').value = formatDateForInput(new Date());
+
+    document.getElementById('tx-card').innerHTML = `<option value="">${_t('No card')}</option>` +
+        allCards.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    document.getElementById('tx-category').innerHTML = `<option value="">${_t('Automatic (by rules or card default)')}</option>` +
+        allCategories.map(c => `<option value="${c.id}">${escapeHtml(_tc(c.name))}</option>`).join('');
+
+    document.getElementById('modal-overlay').style.display = 'block';
+    document.getElementById('modal-transaction').style.display = 'block';
+    document.getElementById('tx-merchant').focus();
+}
+
+// A card that only handles one currency picks it, so the pair can't be mismatched.
+function onTransactionCardChange() {
+    const card = allCards.find(c => c.id === parseInt(document.getElementById('tx-card').value));
+    if (!card) return;
+    if (card.supports_crc && !card.supports_usd) document.getElementById('tx-currency').value = 'CRC';
+    if (card.supports_usd && !card.supports_crc) document.getElementById('tx-currency').value = 'USD';
+}
+
+async function saveTransaction(event) {
+    event.preventDefault();
+
+    const amount = parseFloat(document.getElementById('tx-amount').value);
+    if (isNaN(amount) || amount <= 0) {
+        showNotification(_t('Enter an amount greater than 0'), 'error');
+        return;
+    }
+
+    const cardId = document.getElementById('tx-card').value;
+    const categoryId = document.getElementById('tx-category').value;
+    const data = {
+        date: document.getElementById('tx-date').value,
+        amount,
+        currency: document.getElementById('tx-currency').value,
+        commerce_name: document.getElementById('tx-merchant').value.trim(),
+        transaction_type: document.getElementById('tx-type').value,
+        card_id: cardId ? parseInt(cardId) : null,
+        category_id: categoryId ? parseInt(categoryId) : null,
+        notes: document.getElementById('tx-notes').value.trim() || null,
+    };
+
+    try {
+        await API.Transactions.create(data);
+        closeModal();
+        showNotification(_t('Transaction added'), 'success');
+        // A future-dated one is hidden by the default "Until Today" scope - show everything so it isn't "lost".
+        if (data.date > formatDateForInput(new Date()) && !showUpcomingTransactions) {
+            setTransactionsScope(true);
+        } else {
+            await loadTransactions(currentFilters, 0);
+        }
+    } catch (error) {
+        console.error('Failed to add transaction:', error);
+        showNotification(_t('Failed to add transaction: {error}', { error: _t(error.message) }), 'error');
+    }
+}
+
 function showFilters() {
     const panel = document.getElementById('transaction-filters');
     panel.style.display = panel.style.display === 'none' ? 'grid' : 'none';
@@ -1878,6 +1940,7 @@ function closeModal() {
     document.getElementById('modal-billing-cycles').style.display = 'none';
     document.getElementById('modal-installment-plan').style.display = 'none';
     document.getElementById('modal-income').style.display = 'none';
+    document.getElementById('modal-transaction').style.display = 'none';
     document.getElementById('modal-payoff').style.display = 'none';
     currentCard = null;
     currentCategory = null;
@@ -2366,6 +2429,9 @@ window.handleCredentialsFile = handleCredentialsFile;
 window.handleCredentialsDrop = handleCredentialsDrop;
 window.closeModal = closeModal;
 window.showAddCardModal = showAddCardModal;
+window.showAddTransactionModal = showAddTransactionModal;
+window.onTransactionCardChange = onTransactionCardChange;
+window.saveTransaction = saveTransaction;
 window.editCard = editCard;
 window.saveCard = saveCard;
 window.deleteCard = deleteCard;

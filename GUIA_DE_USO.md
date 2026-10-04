@@ -225,6 +225,7 @@ Una rutina razonable: **Sync Now** una vez por semana, y revisar la pestaña
 **Analytics** los primeros días de cada mes para ver cómo te fue.
 
 Dentro del panel del navegador también puedes:
+- Agregar una transacción a mano (pestaña Transacciones → **+ Agregar transacción**): útil para compras en efectivo o de bancos que no envían correo. Si no se elige categoría, se asigna sola con las reglas de categorización o la categoría predeterminada de la tarjeta.
 - Ver tus gastos del mes, por categoría y por comercio (pestaña Dashboard/Analytics).
 - Asignar o corregir la categoría de cada transacción (pestaña Transactions).
 - Ver tus tarjetas, cuentas y suscripciones.

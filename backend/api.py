@@ -459,7 +459,17 @@ async def create_transaction(
     transaction: schemas.TransactionCreate,
     db: Session = Depends(get_db)
 ):
-    """Create a new transaction."""
+    """Create a transaction by hand (the Gmail sync creates its own)."""
+    if transaction.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+    if transaction.currency not in ("CRC", "USD"):
+        raise HTTPException(status_code=400, detail="Currency must be CRC or USD")
+    if transaction.transaction_type not in ("purchase", "payment"):
+        raise HTTPException(status_code=400, detail="Type must be purchase or payment")
+    if transaction.card_id is not None and not crud.get_card(db, transaction.card_id):
+        raise HTTPException(status_code=404, detail="Card not found")
+    if transaction.category_id is not None and not crud.get_category(db, transaction.category_id):
+        raise HTTPException(status_code=404, detail="Category not found")
     return crud.create_transaction(db, transaction)
 
 

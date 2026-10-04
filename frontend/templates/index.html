@@ -213,6 +213,9 @@
                 <div class="view-header">
                     <h2>Transactions</h2>
                     <div class="view-header-actions">
+                        <button class="btn btn-primary" onclick="showAddTransactionModal()">
+                            <span>+ Add Transaction</span>
+                        </button>
                         <div class="segmented" role="group" aria-label="Which transactions to show">
                             <button id="tx-scope-today" class="active" onclick="setTransactionsScope(false)" title="Hide future-dated transactions, like upcoming Tasa Cero cuotas">Until Today</button>
                             <button id="tx-scope-all" onclick="setTransactionsScope(true)" title="Include upcoming transactions">All (incl. Upcoming)</button>
@@ -653,6 +656,67 @@
     </div>
 
     <!-- Add Income Modal -->
+    <!-- Add Transaction Modal (manual entry) -->
+    <div id="modal-transaction" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Transaction</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="field-hint" style="margin-bottom: 16px;">For purchases that don't send an email (cash, other banks). Transactions that arrive by email are added by "Sync Now" - adding one of those by hand and then syncing would duplicate it.</p>
+                <form id="transaction-form" onsubmit="saveTransaction(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" id="tx-date" class="input" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select id="tx-type" class="input">
+                                <option value="purchase">Purchase</option>
+                                <option value="payment">Payment to the card</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Merchant</label>
+                        <input type="text" id="tx-merchant" class="input" placeholder="e.g. Auto Mercado" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Amount</label>
+                            <input type="number" id="tx-amount" class="input" step="0.01" min="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <select id="tx-currency" class="input">
+                                <option value="CRC">CRC</option>
+                                <option value="USD">USD</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Card</label>
+                        <select id="tx-card" class="input" onchange="onTransactionCardChange()"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="tx-category" class="input"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes (optional)</label>
+                        <input type="text" id="tx-notes" class="input">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-income" class="modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">

@@ -12,10 +12,13 @@ from fastapi.testclient import TestClient
 
 from backend import gmail_client
 from backend.api import app
+from backend.database import Base, engine
 
 
 @pytest.fixture
 def client():
+    # A fresh, empty database for every test, so tests can't affect each other.
+    Base.metadata.drop_all(bind=engine)
     with TestClient(app) as c:  # runs startup -> creates tables
         yield c
 

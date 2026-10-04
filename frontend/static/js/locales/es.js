@@ -196,6 +196,15 @@ window.I18N_ES = {
   "Bank's Sender Email Address": "Dirección de correo del remitente del banco",
   "e.g. notificacion@yourbank.com": "p. ej., notificacion@banco.com",
 
+  // --- Add transaction modal
+  "+ Add Transaction": "+ Agregar transacción",
+  "Add Transaction": "Agregar transacción",
+  "For purchases that don't send an email (cash, other banks). Transactions that arrive by email are added by \"Sync Now\" - adding one of those by hand and then syncing would duplicate it.": "Para compras que no envían correo (efectivo, otros bancos). Las transacciones que llegan por correo se agregan con \"Sincronizar ahora\"; agregar manualmente una de esas y luego sincronizar la duplicaría.",
+  "e.g. Auto Mercado": "p. ej., Auto Mercado",
+  "Purchase": "Compra",
+  "Payment to the card": "Pago a la tarjeta",
+  "Notes (optional)": "Notas (opcional)",
+
   // ===== Rendered by JavaScript (app.js / utils.js) =====
 
   // --- App shell and dashboard
@@ -518,4 +527,12 @@ window.I18N_ES = {
   "category:Salary": "Salario",
   "category:Other Income": "Otros ingresos",
   "category:Other": "Otros",
+
+  // --- Add transaction (manual entry)
+  "Automatic (by rules or card default)": "Automática (según las reglas o la tarjeta)",
+  "Enter an amount greater than 0": "Ingresar un monto mayor que 0",
+  "Transaction added": "Transacción agregada",
+  "Failed to add transaction: {error}": "No se pudo agregar la transacción: {error}",
+  "Amount must be greater than 0": "El monto debe ser mayor que 0",
+  "Type must be purchase or payment": "El tipo debe ser compra o pago",
 };

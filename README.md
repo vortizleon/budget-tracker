@@ -55,6 +55,10 @@ finance-app delete-all && finance-app sync
 
 Frontend (`.html`/`.css`/`.js`) edits don't need `restart` - they're served fresh on every request - but an already-open browser tab only loads the JS once, so hard-refresh (Cmd+Shift+R) to see them.
 
+### Adding a transaction by hand
+
+Transactions tab -> **+ Add Transaction** (date, type, merchant, amount, currency, card, category, notes). For purchases that never produce an email (cash, other banks). Leave the category on *Automatic* and it is picked the way synced ones are: a matching categorization rule first, then the card's default category. Don't enter one that will also arrive by email - the next sync would add it again.
+
 ### How often should I run this?
 
 - **`sync`**: weekly is enough. Gmail keeps your mail indefinitely, so there's no risk of losing data by syncing infrequently - but banks occasionally change their email templates (this happened with both banks here), and a weekly sync surfaces a parsing break while it's a small, recent batch instead of months of backlog to debug at once. Sync more often (daily) if you want the dashboard to feel current.
