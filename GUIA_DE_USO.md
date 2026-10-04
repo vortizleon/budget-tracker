@@ -54,9 +54,10 @@ Opción A (2 minutos).**
    desarrollador que te invitó"**. Es lo esperado: haz clic en **Avanzado**
    → **Ir a Budget Tracker (no seguro)** → **Permitir**.
 
-Con esta opción **te saltas todo lo que sigue**; pasa directo a la sección 4.
+Con esta opción **te saltas la Opción B**; pasa directo a la sección 4.
 
-### Opción B: crea tu propio proyecto de Google
+<details>
+<summary><b>Opción B: crea tu propio proyecto de Google</b> (solo si nadie te puede invitar; toca para abrir)</summary>
 
 Úsala si nadie te puede invitar. Toma unos 5 minutos y es gratis.
 
@@ -150,6 +151,8 @@ iniciar sesión primero).
 > habilitar Gmail API → configurar la pantalla de consentimiento (Usuarios
 > externos) → agregarte como usuario de prueba → crear un cliente de
 > escritorio → descargar el JSON.
+
+</details>
 
 ---
 
