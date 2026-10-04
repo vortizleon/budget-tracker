@@ -82,6 +82,22 @@ uv pip install --python venv/bin/python -r requirements.txt
 
 **Sharing with friends (they skip Google Cloud):** keep your own Google Cloud project in **Testing** status with the Gmail API enabled and a Desktop-app OAuth client. For each friend, add their Gmail under *Google Auth Platform → Audience → Test users* (max 100), then send them the client's `client_secret_*.json` **privately** (never commit it - the repo is public). They drop it in the project folder, the installer renames it, and they click through Google's "unverified app" warning once. Gmail access expires about every 7 days while the project is in Testing (they re-run *Reconnect Gmail*). Their mail and tokens stay on their own machine; you only manage the test-user list.
 
+**When a friend asks for access (your checklist):**
+1. Send them the message below. It already contains the install command.
+2. When they reply with their Gmail (the one that receives the bank emails): open <https://console.cloud.google.com/auth/audience> (project selected), *Add users*, paste the exact address, *Guardar*. This step is manual - as far as I know Google has no public API for test users.
+3. Send them the same `client_secret_*.json` every time (keep it in a pinned chat/note to yourself). Never post it in a public place.
+
+Message template (Spanish):
+
+```
+Hola! Para usar Budget Tracker:
+1) Abre la app Terminal (Cmd+Espacio, escribe "Terminal") y pega esto:
+[ -d ~/Documents/budget-tracker ] || (mkdir -p ~/Documents && curl -fsSL https://github.com/vortizleon/budget-tracker/archive/refs/heads/main.tar.gz | tar -xz -C ~/Documents && mv ~/Documents/budget-tracker-main ~/Documents/budget-tracker); bash ~/Documents/budget-tracker/Instalar.command
+2) Respóndeme con el Gmail donde recibes los correos de tu banco. Yo te agrego y te mando un archivo .json.
+3) Guarda ese archivo en Documentos/budget-tracker y haz doble clic en Instalar.command otra vez.
+Guía completa: https://github.com/vortizleon/budget-tracker/blob/main/GUIA_DE_USO.md
+```
+
 **What to send, and what never to send:** the client file (`client_secret_*.json`) only identifies the app - it grants no mailbox access, so it's the one file you share (privately). Never send `token.json` (it grants read access to *your* Gmail), `budgeting.db` (your transactions) or a zip of your whole project folder, which contains both. Friends get the code from the install command in the guide, not from your folder. To cut off access later, revoke the app at `myaccount.google.com/permissions` or delete/rotate the client in Google Cloud.
 
 **Initialize the database.** Two ways to do this, both equivalent:
