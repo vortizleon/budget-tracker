@@ -41,40 +41,87 @@ iniciar sesión primero).
 
 1. Crea el proyecto: entra a
    **https://console.cloud.google.com/projectcreate**
-   Ponle un nombre, por ejemplo `Budget Tracker`, y clic en **Crear**.
-   Espera unos segundos y asegúrate de que ese proyecto quede seleccionado
-   en el menú de arriba (si tienes más de un proyecto de Google, revisa que
-   diga "Budget Tracker" y no otro).
-2. Habilita Gmail API: con el proyecto ya seleccionado, entra a
+   - **Nombre del proyecto:** `Budget Tracker` (o el que quieras).
+   - **Recurso superior / Ubicación:** déjalo en **Sin organización**.
+   - Clic en **Crear**.
+
+   Te lleva al panel de Google Cloud ("Vista general de Cloud"). **Ignora
+   todo lo que aparece ahí**: el banner de "Comienza tu prueba gratuita" y
+   el botón **Comenzar gratis** (no necesitas facturación ni tarjeta; Gmail
+   API es gratis) y el aviso de "Cloud Hub". Solo confirma que arriba, junto
+   al logo de Google Cloud, aparezca el nombre de tu proyecto. Si tienes
+   más de un proyecto, revisa que sea ese y no otro.
+2. Habilita Gmail API: con el proyecto seleccionado, entra a
    **https://console.cloud.google.com/apis/library/gmail.googleapis.com**
-   y haz clic en **Habilitar**.
-3. Configura la pantalla de consentimiento: entra a
-   **https://console.cloud.google.com/apis/credentials/consent**
-   - Tipo de usuario: **Externo** → Crear.
-   - Nombre de la app: `Budget Tracker`. Correo de asistencia: el tuyo.
-   - Más abajo, en datos de contacto del desarrollador, pon tu correo otra
-     vez.
-   - Clic en **Guardar y continuar** en cada pantalla que siga (en
-     "Permisos"/Scopes no hace falta agregar nada) hasta terminar.
-4. Agrégate como usuario de prueba: en esa misma pantalla de consentimiento
-   (mismo enlace del paso 3), busca la sección **"Usuarios de prueba"**
-   (Test users) → **Add users** → agrega tu propio correo de Gmail →
-   Guardar.
-   (Si te saltas este paso, Google te va a bloquear el acceso más adelante
-   con un error de "acceso no verificado".)
-5. Crea las credenciales: entra a
-   **https://console.cloud.google.com/apis/credentials** → **Crear
-   credenciales** (Create credentials) → **"ID de cliente de OAuth"** (OAuth
-   client ID).
+   y haz clic en el botón azul **Habilitar** (Enable). Espera unos segundos:
+   cuando termine, la página "Detalles del servicio o la API" muestra
+   **Estado: Habilitada**. **No** hagas clic todavía en el botón
+   "Crear credenciales" que aparece arriba; primero va el paso 3.
+3. Configura Google Auth Platform (antes llamada "pantalla de consentimiento
+   de OAuth"): entra a **https://console.cloud.google.com/auth/overview** y
+   haz clic en **Comenzar** (Get started). Es un asistente de 4 pantallas:
+   - **Información de la app:** en "Nombre de la aplicación" escribe
+     `Budget Tracker`. En "Correo electrónico de asistencia al usuario" es
+     una lista desplegable: ábrela y elige tu correo (si lo dejas vacío
+     marca error en rojo). Clic en **Siguiente**.
+
+     ![Paso 1 del asistente: Información de la app](docs/img/google-auth-1-info-app.webp)
+   - **Público:** elige **Usuarios externos** (no "Interno"; "Interno" solo
+     sirve para cuentas de empresa/organización de Google). Dice que tu app
+     "se iniciará en modo de prueba": es lo que queremos. Clic en
+     **Siguiente**.
+
+     ![Paso 2 del asistente: Público](docs/img/google-auth-2-publico.webp)
+   - **Información de contacto:** escribe o elige tu correo (es donde Google
+     te avisaría de cambios en el proyecto) → **Siguiente**.
+   - **Finalizar:** marca la casilla de aceptar la política de datos de
+     usuario de los servicios de las API de Google y guarda con
+     **Continuar** / **Crear**.
+
+   Cuando termine, ves la pantalla "Descripción general de OAuth" con un
+   aviso azul abajo que dice **"Se creó la configuración de OAuth"**. Que
+   diga "Aún no configuraste ningún cliente de OAuth" es normal, eso va en el
+   paso 5.
+
+   ![Configuración de OAuth creada](docs/img/google-auth-3-listo.webp)
+4. Agrégate como usuario de prueba: en el menú de la izquierda, entra a
+   **Público** (o ve a **https://console.cloud.google.com/auth/audience**).
+   Arriba, **Estado de publicación** debe decir **Prueba** (Testing) y
+   **Tipo de usuario** debe decir **Usuarios externos**: déjalos así (no
+   hagas clic en "Publicar app" ni en "Marcar como interno"). Baja hasta
+   **Usuarios de prueba** → **Add users** → escribe tu correo de Gmail →
+   **Guardar**.
+   - Puede salir un aviso **"No se agregaron cuentas no aptas"** aunque el
+     correo sea válido. Clic en **Cerrar** y mira la lista de **Usuarios de
+     prueba**: si tu correo aparece ahí, está bien y puedes seguir.
+   - Si el correo **no** aparece en la lista, vuelve a intentarlo escribiéndolo
+     todo en minúsculas.
+
+   Si tu correo no está en esa lista, Google te bloquea más adelante con un
+   error de "acceso no verificado".
+5. Crea las credenciales: en el menú de la izquierda, entra a **Clientes**
+   (Clients) (o ve a **https://console.cloud.google.com/auth/clients**) →
+   **Crear cliente** (Create client).
    - Tipo de aplicación: **Aplicación de escritorio** (Desktop app).
    - Ponle el nombre que quieras → **Crear**.
-6. Te va a aparecer una ventana con tus datos — haz clic en **Descargar
-   JSON**.
+   - No hace falta tocar "Acceso a los datos" (Data Access) ni agregar
+     permisos: la app los pide sola al conectar Gmail.
+6. Te va a aparecer una ventana con los datos de tu cliente — haz clic en
+   **Descargar JSON**. (Si la cerraste: en **Clientes**, clic en el nombre
+   del cliente que creaste → **Descargar JSON**.) Ese archivo es privado:
+   no lo compartas ni lo subas a ningún lado.
 7. Ve a tu carpeta de **Descargas** y busca ese archivo (algo como
-   `client_secret_123456.json`):
-   - Renómbralo a exactamente: **`credentials.json`**
-   - Muévelo a la carpeta de la app, justo al lado de `Instalar.command`.
+   `client_secret_123456.json`). Muévelo a la carpeta de la app
+   (`Documents/budget-tracker`), justo al lado de `Instalar.command`.
+   **No hace falta renombrarlo**: la app detecta solo el archivo de Google
+   (lo renombra a `credentials.json` por ti).
 8. Vuelve a la sección 2: haz doble clic en **`Instalar.command`** otra vez.
+
+> **Nota:** Google cambia estas pantallas de vez en cuando. Si algo no se ve
+> igual, busca el equivalente por el nombre del botón. Los pasos siempre son:
+> habilitar Gmail API → configurar la pantalla de consentimiento (Usuarios
+> externos) → agregarte como usuario de prueba → crear un cliente de
+> escritorio → descargar el JSON.
 
 ---
 
@@ -202,9 +249,11 @@ Te faltó agregarte como "usuario de prueba" en el paso 4 de la sección
 https://console.cloud.google.com/apis/credentials/consent y agrégate en
 "Usuarios de prueba".
 
-**Dejó de sincronizar / dice que el token expiró**
-En Settings, clic en **Reconnect Gmail** y luego en **Sync Now** para volver
-a autorizar el acceso. (O, por Terminal: `finance-app refresh-oauth`.)
+**Dejó de sincronizar / dice que el token expiró** (puede pasar cada ~7 días)
+Mientras tu proyecto de Google esté en modo **Testing** (como lo dejamos en
+el paso 4), Google hace que el permiso caduque a los 7 días. No es un error
+de la app. En Settings, clic en **Reconnect Gmail** y luego en **Sync Now**
+para volver a autorizar el acceso. (O, por Terminal: `finance-app refresh-oauth`.)
 
 **Las transacciones de un banco dejaron de aparecer bien**
 A veces los bancos cambian el formato de sus correos. Avísale a quien te

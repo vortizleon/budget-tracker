@@ -77,6 +77,9 @@ ok "Componentes instalados."
 echo ""
 
 # --- credentials.json (lo único que cada persona debe hacer por su cuenta) ---
+# Si bajaste el archivo de Google con su nombre original (client_secret_....json)
+# y lo pusiste en esta carpeta, lo renombra a credentials.json automáticamente.
+venv/bin/python -c "from backend.gmail_client import adopt_credentials; adopt_credentials()" 2>/dev/null
 if [[ ! -f "credentials.json" ]]; then
   echo "========================================"
   err "Falta el archivo credentials.json"
@@ -89,8 +92,9 @@ if [[ ! -f "credentials.json" ]]; then
   echo "Sigue la sección 'Configura tu proyecto de Google' de la"
   echo "GUIA_DE_USO.md que viene junto a este archivo."
   echo ""
-  echo "Cuando tengas el archivo credentials.json, colócalo en esta"
-  echo "misma carpeta (junto a este instalador) y vuelve a hacer"
+  echo "Cuando tengas el archivo que descargaste de Google (.json), colócalo"
+  echo "en esta misma carpeta (junto a este instalador, no importa su"
+  echo "nombre) y vuelve a hacer"
   echo "doble clic en Instalar.command para terminar."
   echo ""
   read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."

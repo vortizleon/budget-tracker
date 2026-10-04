@@ -1,6 +1,7 @@
 """Gmail API client for fetching bank receipt emails."""
 import os
 import base64
+import json
 import time
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -18,6 +19,38 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 # Project root directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+CREDENTIALS_NAME = "credentials.json"
+
+
+def _is_desktop_client_file(path: Path) -> bool:
+    """True if `path` is a Google OAuth *desktop* client file (has an "installed" key)."""
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return False
+    return isinstance(data, dict) and "installed" in data
+
+
+def adopt_credentials(base_dir: Path = BASE_DIR) -> Optional[Path]:
+    """Return the path to the OAuth client file, renaming it to credentials.json if needed.
+
+    People download the file from Google Cloud as client_secret_<id>.json and
+    often forget to rename it. If credentials.json is missing, look for any
+    other .json in the project folder that is a desktop OAuth client (token.json
+    and other JSON are ignored) and rename the newest one to credentials.json.
+    Returns None if nothing usable is found.
+    """
+    target = base_dir / CREDENTIALS_NAME
+    if target.exists():
+        return target
+    candidates = [p for p in base_dir.glob("*.json") if _is_desktop_client_file(p)]
+    if not candidates:
+        return None
+    newest = max(candidates, key=lambda p: p.stat().st_mtime)
+    newest.rename(target)
+    print(f"✓ Found {newest.name} - renamed to {CREDENTIALS_NAME}")
+    return target
+
 
 class GmailClient:
     """Client for interacting with Gmail API."""
@@ -34,7 +67,10 @@ class GmailClient:
             credentials_file: Path to OAuth credentials JSON
             token_file: Path to store/load access token
         """
-        self.credentials_path = BASE_DIR / credentials_file
+        if credentials_file == CREDENTIALS_NAME:
+            self.credentials_path = adopt_credentials() or BASE_DIR / credentials_file
+        else:
+            self.credentials_path = BASE_DIR / credentials_file
         self.token_path = BASE_DIR / token_file
         self.service = None
         self._authenticate()
@@ -53,6 +89,11 @@ class GmailClient:
                 print("Refreshing expired token...")
                 creds.refresh(Request())
             else:
+                if not self.credentials_path.exists():
+                    raise FileNotFoundError(
+                        f"No Google OAuth client file found. Download it from Google Cloud "
+                        f"(Desktop app client) and put it in {BASE_DIR}."
+                    )
                 print("Starting OAuth flow...")
                 print("A browser window will open for authentication.")
                 flow = InstalledAppFlow.from_client_secrets_file(

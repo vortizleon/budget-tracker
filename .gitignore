@@ -34,6 +34,7 @@ wheels/
 
 # Gmail credentials
 credentials.json
+client_secret*.json
 token.json
 token.json.*
 token.pickle
