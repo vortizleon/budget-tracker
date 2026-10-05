@@ -1,6 +1,6 @@
 """Pydantic schemas for API requests and responses."""
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+from pydantic import BaseModel, Field, ConfigDict, StringConstraints
+from typing import Annotated, Optional, List
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -8,6 +8,10 @@ from decimal import Decimal
 # ============================================================================
 # Card Schemas
 # ============================================================================
+
+# #rgb / #rrggbb only - colors end up in style attributes in the UI.
+HexColor = Annotated[str, StringConstraints(pattern=r"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")]
+
 
 class CardBase(BaseModel):
     """Base card schema with common fields."""
@@ -27,7 +31,7 @@ class CardBase(BaseModel):
 
 class CardCreate(CardBase):
     """Schema for creating a new card."""
-    pass
+    color: HexColor = "#4F46E5"
 
 
 class CardUpdate(BaseModel):
@@ -42,7 +46,7 @@ class CardUpdate(BaseModel):
     payment_due_day: Optional[int] = Field(None, ge=1, le=31)
     cutoff_day: Optional[int] = Field(None, ge=1, le=31)
     bank: Optional[str] = None
-    color: Optional[str] = None
+    color: Optional[HexColor] = None
     default_category_id: Optional[int] = None
     is_active: Optional[bool] = None
 
@@ -56,8 +60,6 @@ class CardResponse(CardBase):
     # Calculated fields (can be added by endpoint)
     total_spent_crc: Optional[Decimal] = None
     total_spent_usd: Optional[Decimal] = None
-    utilization_crc: Optional[float] = None  # Percentage
-    utilization_usd: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -88,7 +90,7 @@ class CategoryBase(BaseModel):
 
 class CategoryCreate(CategoryBase):
     """Schema for creating a new category."""
-    pass
+    color: HexColor = "#6B7280"
 
 
 class CategoryUpdate(BaseModel):
@@ -96,7 +98,7 @@ class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     category_type: Optional[str] = None
     parent_id: Optional[int] = None
-    color: Optional[str] = None
+    color: Optional[HexColor] = None
     icon: Optional[str] = None
 
 
@@ -356,17 +358,13 @@ class TopMerchant(BaseModel):
     currency: str
 
 
-class CardUtilization(BaseModel):
-    """Schema for card utilization data."""
+class SpendingByCard(BaseModel):
+    """Schema for per-card spending totals."""
     card_id: int
     card_name: str
     card_color: str
     spent_crc: Decimal
-    limit_crc: Optional[Decimal]
-    utilization_crc: Optional[float]  # Percentage
     spent_usd: Decimal
-    limit_usd: Optional[Decimal]
-    utilization_usd: Optional[float]  # Percentage
 
 
 class DashboardSummary(BaseModel):

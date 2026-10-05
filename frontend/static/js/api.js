@@ -503,16 +503,16 @@ const AnalyticsAPI = {
     /**
      * Get per-card spending
      * @param {object} filters - { start_date, end_date }
-     * @returns {Promise<Array>} Card utilization data
+     * @returns {Promise<Array>} Per-card spending
      */
-    async getCardUtilization(filters = {}) {
+    async getSpendingByCard(filters = {}) {
         const params = new URLSearchParams();
 
         if (filters.start_date) params.append('start_date', filters.start_date);
         if (filters.end_date) params.append('end_date', filters.end_date);
 
         const queryString = params.toString();
-        return apiRequest(queryString ? `/api/analytics/card-utilization?${queryString}` : '/api/analytics/card-utilization');
+        return apiRequest(queryString ? `/api/analytics/spending-by-card?${queryString}` : '/api/analytics/spending-by-card');
     },
 };
 

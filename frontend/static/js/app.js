@@ -271,7 +271,9 @@ async function showView(viewName, { push = true } = {}) {
             await loadTransactions();
             break;
         case 'analytics':
-            await loadAnalytics(currentAnalyticsFilters);
+            // Default to the current month the first time; afterwards keep whatever range was picked.
+            if (analyticsRangeInitialized) await loadAnalytics(currentAnalyticsFilters);
+            else await setAnalyticsPreset('month');
             break;
         case 'forecast':
             await loadMonthForecast();
@@ -1332,6 +1334,7 @@ function clearFilters() {
 // ============================================================================
 
 let currentAnalyticsFilters = {};
+let analyticsRangeInitialized = false;
 let cachedOldestTransactionDate = null;
 
 // ApexCharts ships only English UI strings in the main bundle (toolbar menu, tooltips),
@@ -1557,7 +1560,7 @@ async function loadAnalytics(filters = {}) {
             API.Analytics.getSpendingByCategory({ currency: 'USD', start_date, end_date }),
             API.Analytics.getTopMerchants({ currency: 'CRC', start_date, end_date, limit: 10 }),
             API.Analytics.getTopMerchants({ currency: 'USD', start_date, end_date, limit: 10 }),
-            API.Analytics.getCardUtilization({ start_date, end_date }),
+            API.Analytics.getSpendingByCard({ start_date, end_date }),
         ]);
 
         renderDailySpendingChart(dailyCrc, dailyUsd);
@@ -1566,7 +1569,7 @@ async function loadAnalytics(filters = {}) {
         renderCategoryPieChart(categoryUsd, '#chart-category-pie-usd', 'USD');
         renderTopMerchantsChart(merchantsCrc, '#chart-top-merchants-crc', 'CRC');
         renderTopMerchantsChart(merchantsUsd, '#chart-top-merchants-usd', 'USD');
-        renderCardUtilizationChart(cardData);
+        renderSpendingByCardChart(cardData);
     } catch (error) {
         console.error('Failed to load analytics:', error);
         showNotification(_t('Failed to load analytics'), 'error');
@@ -1581,12 +1584,11 @@ function applyAnalyticsFilters() {
 }
 
 function clearAnalyticsFilters() {
-    document.getElementById('analytics-start-date').value = '';
-    document.getElementById('analytics-end-date').value = '';
-    loadAnalytics({});
+    setAnalyticsPreset('month');   // back to the default range
 }
 
 async function setAnalyticsPreset(preset) {
+    analyticsRangeInitialized = true;
     const fmt = formatDateForInput;
     const today = new Date();
     let start;
@@ -1617,7 +1619,7 @@ async function setAnalyticsPreset(preset) {
 
     document.getElementById('analytics-start-date').value = start;
     document.getElementById('analytics-end-date').value = end;
-    loadAnalytics({ start_date: start, end_date: end });
+    await loadAnalytics({ start_date: start, end_date: end });
 }
 
 function renderCategoryPieChart(data, containerId, currency) {
@@ -1738,8 +1740,8 @@ function renderTopMerchantsChart(data, containerId, currency) {
     });
 }
 
-function renderCardUtilizationChart(data) {
-    renderChart("#chart-card-utilization", {
+function renderSpendingByCardChart(data) {
+    renderChart("#chart-spending-by-card", {
         series: [
             { name: _t('Spent (CRC)'), data: data.map(d => parseFloat(d.spent_crc)) },
             { name: _t('Spent (USD)'), data: data.map(d => parseFloat(d.spent_usd)) }
@@ -1808,8 +1810,8 @@ function renderCategories(categories) {
     container.innerHTML = categories.map(cat => `
         <div class="category-item">
             <div class="category-info">
-                <div class="category-color-dot" style="background-color: ${cat.color}"></div>
-                <div class="category-icon">${cat.icon}</div>
+                <div class="category-color-dot" style="background-color: ${safeColor(cat.color)}"></div>
+                <div class="category-icon">${escapeHtml(cat.icon)}</div>
                 <div class="category-name">${escapeHtml(_tc(cat.name))}</div>
             </div>
             <div class="category-actions">

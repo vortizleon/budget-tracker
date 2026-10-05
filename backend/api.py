@@ -1,4 +1,6 @@
 """FastAPI application with REST API endpoints."""
+import threading
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -17,21 +19,34 @@ from . import models, schemas, crud, analytics, budgets, payoff, forecast, gmail
 from .database import get_db, init_db
 from .sync import TransactionSyncer
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize database on startup."""
+    init_db()
+    yield
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Budgeting App API",
     description="Personal budgeting and expense tracking application",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
-# CORS middleware for frontend
+# CORS: the frontend is served from this same server, so it needs no CORS at
+# all. Only allow local origins so a random website open in the browser can't
+# read or change your data through localhost.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
-    allow_credentials=True,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Only one Gmail sync at a time: two at once race on the unique message id and
+# can open two login prompts.
+_sync_lock = threading.Lock()
 
 # Setup static files and templates
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -43,12 +58,6 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "frontend" / "templates"))
 # Root & Frontend Routes
 # ============================================================================
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database on startup."""
-    init_db()
-
-
 # Each sidebar view has its own URL (/budgets, /analytics, ...) so reloading
 # or sharing a link keeps you on that view - they all serve the same page and
 # app.js picks the view from the path. Keep in sync with VIEWS in app.js.
@@ -56,9 +65,9 @@ SPA_VIEWS = ["budgets", "transactions", "analytics", "forecast", "categories", "
 
 
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
+def read_root(request: Request):
     """Serve the main SPA page."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 
 for _view in SPA_VIEWS:
@@ -66,7 +75,7 @@ for _view in SPA_VIEWS:
 
 
 @app.get("/health")
-async def health_check():
+def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "timestamp": datetime.now()}
 
@@ -76,7 +85,7 @@ async def health_check():
 # ============================================================================
 
 @app.get("/api/cards", response_model=List[schemas.CardResponse])
-async def get_cards(
+def get_cards(
     skip: int = 0,
     limit: int = 100,
     active_only: bool = True,
@@ -98,20 +107,9 @@ async def get_cards(
             if t.currency == "USD" and t.transaction_type == "purchase"
         )
 
-        # Calculate utilization
-        util_crc = None
-        if card.credit_limit_crc and card.credit_limit_crc > 0:
-            util_crc = float((spent_crc / card.credit_limit_crc) * 100)
-
-        util_usd = None
-        if card.credit_limit_usd and card.credit_limit_usd > 0:
-            util_usd = float((spent_usd / card.credit_limit_usd) * 100)
-
         card_response = schemas.CardResponse.model_validate(card)
         card_response.total_spent_crc = spent_crc
         card_response.total_spent_usd = spent_usd
-        card_response.utilization_crc = round(util_crc, 2) if util_crc else None
-        card_response.utilization_usd = round(util_usd, 2) if util_usd else None
 
         card_responses.append(card_response)
 
@@ -119,7 +117,7 @@ async def get_cards(
 
 
 @app.get("/api/cards/{card_id}", response_model=schemas.CardResponse)
-async def get_card(card_id: int, db: Session = Depends(get_db)):
+def get_card(card_id: int, db: Session = Depends(get_db)):
     """Get a single card by ID."""
     card = crud.get_card(db, card_id)
     if not card:
@@ -128,13 +126,13 @@ async def get_card(card_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/api/cards", response_model=schemas.CardResponse, status_code=201)
-async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db)):
+def create_card(card: schemas.CardCreate, db: Session = Depends(get_db)):
     """Create a new card."""
     return crud.create_card(db, card)
 
 
 @app.put("/api/cards/{card_id}", response_model=schemas.CardResponse)
-async def update_card(
+def update_card(
     card_id: int,
     card_update: schemas.CardUpdate,
     db: Session = Depends(get_db)
@@ -153,7 +151,7 @@ async def update_card(
 
 
 @app.delete("/api/cards/{card_id}", status_code=204)
-async def delete_card(card_id: int, db: Session = Depends(get_db)):
+def delete_card(card_id: int, db: Session = Depends(get_db)):
     """Soft delete a card."""
     success = crud.delete_card(db, card_id)
     if not success:
@@ -165,7 +163,7 @@ async def delete_card(card_id: int, db: Session = Depends(get_db)):
 # ============================================================================
 
 @app.get("/api/categories", response_model=List[schemas.CategoryResponse])
-async def get_categories(
+def get_categories(
     skip: int = 0,
     limit: int = 100,
     category_type: Optional[str] = None,
@@ -186,7 +184,7 @@ async def get_categories(
 
 
 @app.get("/api/categories/{category_id}", response_model=schemas.CategoryResponse)
-async def get_category(category_id: int, db: Session = Depends(get_db)):
+def get_category(category_id: int, db: Session = Depends(get_db)):
     """Get a single category by ID."""
     category = crud.get_category(db, category_id)
     if not category:
@@ -195,13 +193,13 @@ async def get_category(category_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/api/categories", response_model=schemas.CategoryResponse, status_code=201)
-async def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_db)):
+def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_db)):
     """Create a new category."""
     return crud.create_category(db, category)
 
 
 @app.put("/api/categories/{category_id}", response_model=schemas.CategoryResponse)
-async def update_category(
+def update_category(
     category_id: int,
     category_update: schemas.CategoryUpdate,
     db: Session = Depends(get_db)
@@ -214,7 +212,7 @@ async def update_category(
 
 
 @app.delete("/api/categories/{category_id}", status_code=204)
-async def delete_category(category_id: int, db: Session = Depends(get_db)):
+def delete_category(category_id: int, db: Session = Depends(get_db)):
     """Delete a category (only if no transactions use it)."""
     success = crud.delete_category(db, category_id)
     if not success:
@@ -242,21 +240,21 @@ def _rule_to_response(rule: models.CategorizationRule) -> schemas.Categorization
 
 
 @app.get("/api/categorization-rules", response_model=List[schemas.CategorizationRuleResponse])
-async def get_categorization_rules(category_id: Optional[int] = None, db: Session = Depends(get_db)):
+def get_categorization_rules(category_id: Optional[int] = None, db: Session = Depends(get_db)):
     """Get categorization rules, optionally filtered by category."""
     rules = crud.get_categorization_rules(db, category_id=category_id)
     return [_rule_to_response(r) for r in rules]
 
 
 @app.post("/api/categorization-rules", response_model=schemas.CategorizationRuleResponse, status_code=201)
-async def create_categorization_rule(rule: schemas.CategorizationRuleCreate, db: Session = Depends(get_db)):
+def create_categorization_rule(rule: schemas.CategorizationRuleCreate, db: Session = Depends(get_db)):
     """Create a categorization rule."""
     db_rule = crud.create_categorization_rule(db, rule)
     return _rule_to_response(db_rule)
 
 
 @app.delete("/api/categorization-rules/{rule_id}", status_code=204)
-async def delete_categorization_rule(rule_id: int, db: Session = Depends(get_db)):
+def delete_categorization_rule(rule_id: int, db: Session = Depends(get_db)):
     """Delete a categorization rule."""
     if not crud.delete_categorization_rule(db, rule_id):
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -267,7 +265,7 @@ async def delete_categorization_rule(rule_id: int, db: Session = Depends(get_db)
 # ============================================================================
 
 @app.get("/api/accounts", response_model=List[schemas.AccountResponse])
-async def get_accounts(
+def get_accounts(
     skip: int = 0,
     limit: int = 100,
     active_only: bool = True,
@@ -289,7 +287,7 @@ async def get_accounts(
 
 
 @app.get("/api/accounts/{account_id}", response_model=schemas.AccountResponse)
-async def get_account(
+def get_account(
     account_id: int,
     include_balance: bool = Query(True, description="Include calculated available balance"),
     db: Session = Depends(get_db)
@@ -307,13 +305,13 @@ async def get_account(
 
 
 @app.post("/api/accounts", response_model=schemas.AccountResponse, status_code=201)
-async def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db)):
+def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db)):
     """Create a new account."""
     return crud.create_account(db, account)
 
 
 @app.put("/api/accounts/{account_id}", response_model=schemas.AccountResponse)
-async def update_account(
+def update_account(
     account_id: int,
     account_update: schemas.AccountUpdate,
     db: Session = Depends(get_db)
@@ -326,7 +324,7 @@ async def update_account(
 
 
 @app.get("/api/balances/summary", response_model=schemas.BalanceSummary)
-async def get_balance_summary(db: Session = Depends(get_db)):
+def get_balance_summary(db: Session = Depends(get_db)):
     """
     Get comprehensive balance summary for all accounts.
 
@@ -385,7 +383,7 @@ async def get_balance_summary(db: Session = Depends(get_db)):
 # ============================================================================
 
 @app.get("/api/transactions")
-async def get_transactions(
+def get_transactions(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     card_ids: Optional[str] = None,  # Comma-separated IDs
@@ -446,7 +444,7 @@ async def get_transactions(
 
 
 @app.get("/api/transactions/{transaction_id}", response_model=schemas.TransactionResponse)
-async def get_transaction(transaction_id: int, db: Session = Depends(get_db)):
+def get_transaction(transaction_id: int, db: Session = Depends(get_db)):
     """Get a single transaction by ID."""
     transaction = crud.get_transaction(db, transaction_id)
     if not transaction:
@@ -455,7 +453,7 @@ async def get_transaction(transaction_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/api/transactions", response_model=schemas.TransactionResponse, status_code=201)
-async def create_transaction(
+def create_transaction(
     transaction: schemas.TransactionCreate,
     db: Session = Depends(get_db)
 ):
@@ -474,7 +472,7 @@ async def create_transaction(
 
 
 @app.put("/api/transactions/{transaction_id}", response_model=schemas.TransactionResponse)
-async def update_transaction(
+def update_transaction(
     transaction_id: int,
     transaction_update: schemas.TransactionUpdate,
     db: Session = Depends(get_db)
@@ -487,7 +485,7 @@ async def update_transaction(
 
 
 @app.delete("/api/transactions/{transaction_id}", status_code=204)
-async def delete_transaction(transaction_id: int, db: Session = Depends(get_db)):
+def delete_transaction(transaction_id: int, db: Session = Depends(get_db)):
     """Delete a transaction."""
     success = crud.delete_transaction(db, transaction_id)
     if not success:
@@ -495,7 +493,7 @@ async def delete_transaction(transaction_id: int, db: Session = Depends(get_db))
 
 
 @app.patch("/api/transactions/bulk-categorize")
-async def bulk_categorize_transactions(
+def bulk_categorize_transactions(
     bulk_request: schemas.BulkCategorizeRequest,
     db: Session = Depends(get_db)
 ):
@@ -513,7 +511,7 @@ async def bulk_categorize_transactions(
 # ============================================================================
 
 @app.get("/api/analytics/spending-by-category", response_model=List[schemas.SpendingByCategory])
-async def get_spending_by_category(
+def get_spending_by_category(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     currency: Optional[str] = None,
@@ -529,7 +527,7 @@ async def get_spending_by_category(
 
 
 @app.get("/api/analytics/daily-spending", response_model=List[schemas.DailySpending])
-async def get_daily_spending(
+def get_daily_spending(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     currency: str = "CRC",
@@ -545,7 +543,7 @@ async def get_daily_spending(
 
 
 @app.get("/api/analytics/monthly-trends", response_model=List[schemas.MonthlyTrend])
-async def get_monthly_trends(
+def get_monthly_trends(
     months_back: int = 6,
     currency: Optional[str] = None,
     db: Session = Depends(get_db)
@@ -555,7 +553,7 @@ async def get_monthly_trends(
 
 
 @app.get("/api/analytics/top-merchants", response_model=List[schemas.TopMerchant])
-async def get_top_merchants(
+def get_top_merchants(
     limit: int = 10,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
@@ -572,24 +570,24 @@ async def get_top_merchants(
     )
 
 
-@app.get("/api/analytics/card-utilization", response_model=List[schemas.CardUtilization])
-async def get_card_utilization(
+@app.get("/api/analytics/spending-by-card", response_model=List[schemas.SpendingByCard])
+def get_spending_by_card(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_db)
 ):
     """Get per-card spending, optionally limited to a date range."""
-    return analytics.get_card_utilization(db, start_date=start_date, end_date=end_date)
+    return analytics.get_spending_by_card(db, start_date=start_date, end_date=end_date)
 
 
 @app.get("/api/analytics/month-forecast", response_model=schemas.MonthForecast)
-async def get_month_forecast(db: Session = Depends(get_db)):
+def get_month_forecast(db: Session = Depends(get_db)):
     """Projected month-end spending per category at the current pace."""
     return forecast.get_month_forecast(db)
 
 
 @app.get("/api/analytics/dashboard-summary", response_model=schemas.DashboardSummary)
-async def get_dashboard_summary(db: Session = Depends(get_db)):
+def get_dashboard_summary(db: Session = Depends(get_db)):
     """Get dashboard summary statistics."""
     return analytics.get_dashboard_summary(db)
 
@@ -599,13 +597,13 @@ async def get_dashboard_summary(db: Session = Depends(get_db)):
 # ============================================================================
 
 @app.get("/api/email-sources", response_model=List[schemas.EmailSourceResponse])
-async def get_email_sources(active_only: bool = True, db: Session = Depends(get_db)):
+def get_email_sources(active_only: bool = True, db: Session = Depends(get_db)):
     """Get list of email sources."""
     return crud.get_email_sources(db, active_only=active_only)
 
 
 @app.post("/api/email-sources", response_model=schemas.EmailSourceResponse, status_code=201)
-async def create_email_source(
+def create_email_source(
     source: schemas.EmailSourceCreate,
     db: Session = Depends(get_db)
 ):
@@ -614,7 +612,7 @@ async def create_email_source(
 
 
 @app.put("/api/email-sources/{source_id}", response_model=schemas.EmailSourceResponse)
-async def update_email_source(
+def update_email_source(
     source_id: int,
     source_update: schemas.EmailSourceUpdate,
     db: Session = Depends(get_db)
@@ -631,20 +629,20 @@ async def update_email_source(
 # ============================================================================
 
 @app.get("/api/installment-plans", response_model=List[schemas.InstallmentPlanResponse])
-async def get_installment_plans(db: Session = Depends(get_db)):
+def get_installment_plans(db: Session = Depends(get_db)):
     """Get all installment plans."""
     return crud.get_installment_plans(db)
 
 
 @app.post("/api/installment-plans", response_model=schemas.InstallmentPlanResponse, status_code=201)
-async def create_installment_plan(plan: schemas.InstallmentPlanCreate, db: Session = Depends(get_db)):
+def create_installment_plan(plan: schemas.InstallmentPlanCreate, db: Session = Depends(get_db)):
     """Create an installment plan - generates all of its monthly charges immediately."""
     db_plan = crud.create_installment_plan(db, plan)
     return crud._installment_plan_to_response(db, db_plan)
 
 
 @app.delete("/api/installment-plans/{plan_id}", status_code=204)
-async def delete_installment_plan(plan_id: int, db: Session = Depends(get_db)):
+def delete_installment_plan(plan_id: int, db: Session = Depends(get_db)):
     """Delete an installment plan and all of its generated transactions."""
     if not crud.delete_installment_plan(db, plan_id):
         raise HTTPException(status_code=404, detail="Installment plan not found")
@@ -662,7 +660,7 @@ def _check_month(month: Optional[str]) -> None:
 
 
 @app.get("/api/budgets", response_model=schemas.BudgetOverview)
-async def get_budget_overview(month: Optional[str] = None, db: Session = Depends(get_db)):
+def get_budget_overview(month: Optional[str] = None, db: Session = Depends(get_db)):
     """Budgets, income and spending for a month ("YYYY-MM", default: current).
     The first call ever also seeds the suggested budgets."""
     _check_month(month)
@@ -670,7 +668,7 @@ async def get_budget_overview(month: Optional[str] = None, db: Session = Depends
 
 
 @app.put("/api/budgets")
-async def upsert_budget(data: schemas.BudgetUpsert, db: Session = Depends(get_db)):
+def upsert_budget(data: schemas.BudgetUpsert, db: Session = Depends(get_db)):
     """Create or update a category's budget (by % of income or fixed amount)."""
     try:
         budget = budgets.upsert_budget(db, data)
@@ -682,33 +680,33 @@ async def upsert_budget(data: schemas.BudgetUpsert, db: Session = Depends(get_db
 
 
 @app.patch("/api/budgets/{budget_id}", status_code=204)
-async def set_budget_protected(budget_id: int, data: schemas.BudgetProtectedUpdate, db: Session = Depends(get_db)):
+def set_budget_protected(budget_id: int, data: schemas.BudgetProtectedUpdate, db: Session = Depends(get_db)):
     """Lock/unlock a budget against being reduced for debt payments."""
     if not budgets.set_protected(db, budget_id, data.is_protected):
         raise HTTPException(status_code=404, detail="Budget not found")
 
 
 @app.delete("/api/budgets/{budget_id}", status_code=204)
-async def delete_budget(budget_id: int, db: Session = Depends(get_db)):
+def delete_budget(budget_id: int, db: Session = Depends(get_db)):
     """Remove a category's budget."""
     if not budgets.delete_budget(db, budget_id):
         raise HTTPException(status_code=404, detail="Budget not found")
 
 
 @app.post("/api/budgets/reset-suggested")
-async def reset_budgets_to_suggested(db: Session = Depends(get_db)):
+def reset_budgets_to_suggested(db: Session = Depends(get_db)):
     """Replace all budgets with the suggested starting percentages."""
     return {"budgets": budgets.reset_to_suggested(db)}
 
 
 @app.put("/api/budget-settings", response_model=schemas.BudgetSettingsResponse)
-async def update_budget_settings(update: schemas.BudgetSettingsUpdate, db: Session = Depends(get_db)):
+def update_budget_settings(update: schemas.BudgetSettingsUpdate, db: Session = Depends(get_db)):
     """Update expected monthly income and/or the USD->CRC rate."""
     return budgets.update_settings(db, update)
 
 
 @app.post("/api/income", response_model=schemas.IncomeEntryResponse, status_code=201)
-async def create_income(data: schemas.IncomeEntryCreate, db: Session = Depends(get_db)):
+def create_income(data: schemas.IncomeEntryCreate, db: Session = Depends(get_db)):
     """Log a received payment."""
     try:
         return budgets.create_income(db, data)
@@ -717,7 +715,7 @@ async def create_income(data: schemas.IncomeEntryCreate, db: Session = Depends(g
 
 
 @app.delete("/api/income/{income_id}", status_code=204)
-async def delete_income(income_id: int, db: Session = Depends(get_db)):
+def delete_income(income_id: int, db: Session = Depends(get_db)):
     """Delete a logged payment."""
     if not budgets.delete_income(db, income_id):
         raise HTTPException(status_code=404, detail="Income entry not found")
@@ -728,7 +726,7 @@ async def delete_income(income_id: int, db: Session = Depends(get_db)):
 # ============================================================================
 
 @app.get("/api/cards/{card_id}/billing-cycles", response_model=List[schemas.CardBillingCycle])
-async def get_card_billing_cycles(card_id: int, db: Session = Depends(get_db)):
+def get_card_billing_cycles(card_id: int, db: Session = Depends(get_db)):
     """Group a card's purchases into statement cycles based on its cutoff day."""
     card = crud.get_card(db, card_id)
     if not card:
@@ -739,7 +737,7 @@ async def get_card_billing_cycles(card_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/api/cards/{card_id}/payoff-plan", response_model=schemas.CardPayoffPlanResponse)
-async def get_card_payoff_plan(card_id: int, db: Session = Depends(get_db)):
+def get_card_payoff_plan(card_id: int, db: Session = Depends(get_db)):
     """A card's saved payoff plan (if any) and its recent monthly spend."""
     if not crud.get_card(db, card_id):
         raise HTTPException(status_code=404, detail="Card not found")
@@ -747,7 +745,7 @@ async def get_card_payoff_plan(card_id: int, db: Session = Depends(get_db)):
 
 
 @app.put("/api/cards/{card_id}/payoff-plan", response_model=schemas.CardPayoffPlanResponse)
-async def save_card_payoff_plan(
+def save_card_payoff_plan(
     card_id: int,
     data: schemas.CardPayoffPlanUpdate,
     db: Session = Depends(get_db)
@@ -759,7 +757,7 @@ async def save_card_payoff_plan(
 
 
 @app.delete("/api/cards/{card_id}/payoff-plan", status_code=204)
-async def delete_card_payoff_plan(card_id: int, db: Session = Depends(get_db)):
+def delete_card_payoff_plan(card_id: int, db: Session = Depends(get_db)):
     """Delete a card's payoff plan."""
     if not payoff.delete_plan(db, card_id):
         raise HTTPException(status_code=404, detail="Payoff plan not found")
@@ -770,7 +768,7 @@ async def delete_card_payoff_plan(card_id: int, db: Session = Depends(get_db)):
 # ============================================================================
 
 @app.get("/api/subscriptions", response_model=List[schemas.SubscriptionResponse])
-async def get_subscriptions(
+def get_subscriptions(
     skip: int = 0,
     limit: int = 100,
     active_only: bool = True,
@@ -782,7 +780,7 @@ async def get_subscriptions(
 
 
 @app.get("/api/subscriptions/{subscription_id}", response_model=schemas.SubscriptionResponse)
-async def get_subscription(subscription_id: int, db: Session = Depends(get_db)):
+def get_subscription(subscription_id: int, db: Session = Depends(get_db)):
     """Get a single subscription by ID."""
     subscription = crud.get_subscription(db, subscription_id)
     if not subscription:
@@ -791,7 +789,7 @@ async def get_subscription(subscription_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/api/subscriptions", response_model=schemas.SubscriptionResponse, status_code=201)
-async def create_subscription(
+def create_subscription(
     subscription: schemas.SubscriptionCreate,
     db: Session = Depends(get_db)
 ):
@@ -800,7 +798,7 @@ async def create_subscription(
 
 
 @app.put("/api/subscriptions/{subscription_id}", response_model=schemas.SubscriptionResponse)
-async def update_subscription(
+def update_subscription(
     subscription_id: int,
     subscription_update: schemas.SubscriptionUpdate,
     db: Session = Depends(get_db)
@@ -813,7 +811,7 @@ async def update_subscription(
 
 
 @app.delete("/api/subscriptions/{subscription_id}", status_code=204)
-async def delete_subscription(subscription_id: int, db: Session = Depends(get_db)):
+def delete_subscription(subscription_id: int, db: Session = Depends(get_db)):
     """Soft delete a subscription."""
     if not crud.delete_subscription(db, subscription_id):
         raise HTTPException(status_code=404, detail="Subscription not found")
@@ -832,6 +830,15 @@ def trigger_sync(
 ):
     """Trigger Gmail sync - either a rolling N-day window (days_back) or an
     explicit start_date/end_date backfill, same as `finance-app sync`."""
+    if not _sync_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="A sync is already running - wait for it to finish")
+    try:
+        return _run_sync(sync_request, db)
+    finally:
+        _sync_lock.release()
+
+
+def _run_sync(sync_request: schemas.SyncRequest, db: Session):
     email_sources = crud.get_email_sources(db, active_only=True)
 
     if not email_sources:
@@ -874,7 +881,7 @@ def trigger_sync(
 
 
 @app.post("/api/maintenance/recategorize")
-async def recategorize_transactions(all: bool = False, db: Session = Depends(get_db)):
+def recategorize_transactions(all: bool = False, db: Session = Depends(get_db)):
     """Re-apply categorization rules to existing transactions - mirrors
     `finance-app recategorize`. Only touches `Uncategorized` transactions
     unless `all=true`. Deliberately doesn't go through TransactionSyncer
@@ -926,7 +933,7 @@ class CredentialsUpload(BaseModel):
 
 
 @app.get("/api/settings/credentials")
-async def get_credentials_status():
+def get_credentials_status():
     """Whether the Google OAuth client file / Gmail login are in place."""
     base = gmail_client.BASE_DIR
     return {
@@ -936,7 +943,7 @@ async def get_credentials_status():
 
 
 @app.post("/api/settings/credentials")
-async def upload_credentials(upload: CredentialsUpload):
+def upload_credentials(upload: CredentialsUpload):
     """Save the Google OAuth client file uploaded from the Settings page as
     credentials.json. Replacing it with a different client invalidates the
     stored Gmail login, so token.json is removed and the next sync logs in again."""
@@ -972,7 +979,7 @@ def get_gmail_status():
 
 
 @app.post("/api/maintenance/reconnect-gmail")
-async def reconnect_gmail():
+def reconnect_gmail():
     """Discard the stored Gmail token, same as `finance-app refresh-oauth` -
     the next sync will prompt a fresh login in the browser."""
     token_path = Path(__file__).resolve().parent.parent / "token.json"
@@ -983,7 +990,7 @@ async def reconnect_gmail():
 
 
 @app.get("/api/sync/status")
-async def get_sync_status(db: Session = Depends(get_db)):
+def get_sync_status(db: Session = Depends(get_db)):
     """Get sync status information."""
     # Get last transaction import time
     last_transaction = db.query(models.Transaction.created_at).order_by(

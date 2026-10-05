@@ -135,10 +135,10 @@ function truncateText(text, maxLength) {
 /**
  * Get category icon or default
  * @param {object} category - Category object
- * @returns {string} Icon emoji
+ * @returns {string} Icon emoji (HTML-escaped)
  */
 function getCategoryIcon(category) {
-    return category?.icon || '📁';
+    return escapeHtml(category?.icon || '📁');
 }
 
 /**
@@ -147,7 +147,7 @@ function getCategoryIcon(category) {
  * @returns {string} Color hex code
  */
 function getCategoryColor(category) {
-    return category?.color || '#6B7280';
+    return safeColor(category?.color, '#6B7280');
 }
 
 /**
@@ -157,7 +157,7 @@ function getCategoryColor(category) {
  */
 function maskCardNumber(lastFour) {
     if (!lastFour) return '•••• •••• •••• ••••';
-    return `•••• •••• •••• ${lastFour}`;
+    return `•••• •••• •••• ${escapeHtml(lastFour)}`;
 }
 
 /**
@@ -301,6 +301,7 @@ function getTransactionTypeBadge(type) {
  * @returns {string} CSS gradient string
  */
 function getCardGradient(color) {
+    color = safeColor(color, '#4F46E5');
     // Create a subtle gradient from the base color
     return `linear-gradient(135deg, ${color} 0%, ${adjustColorBrightness(color, -20)} 100%)`;
 }
@@ -312,6 +313,7 @@ function getCardGradient(color) {
  * @returns {string} Adjusted hex color
  */
 function adjustColorBrightness(hexColor, percent) {
+    if (hexColor.length === 4) hexColor = '#' + [...hexColor.slice(1)].map(c => c + c).join('');
     const num = parseInt(hexColor.slice(1), 16);
     const amt = Math.round(2.55 * percent);
     const R = (num >> 16) + amt;
@@ -374,7 +376,19 @@ function validateField(field) {
  * @returns {string} Escaped text
  */
 function escapeHtml(text) {
+    // Also escape quotes: textContent->innerHTML leaves them alone, which lets a value
+    // break out of an attribute like value="${escapeHtml(x)}".
     const div = document.createElement('div');
     div.textContent = text;
-    return div.innerHTML;
+    return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/**
+ * Only let a plain hex color into a style attribute / CSS value.
+ * @param {string} color - Color from the API
+ * @param {string} fallback - Used when it isn't a #rgb / #rrggbb value
+ * @returns {string} Safe color
+ */
+function safeColor(color, fallback = '#6B7280') {
+    return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color || '') ? color : fallback;
 }
