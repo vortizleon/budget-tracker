@@ -502,6 +502,11 @@ const AnalyticsAPI = {
         return apiRequest(endpoint);
     },
 
+    /** What card debt costs per month, from imported statements. */
+    async getCostOfDebt() {
+        return apiRequest('/api/analytics/cost-of-debt');
+    },
+
     /**
      * Get per-card spending
      * @param {object} filters - { start_date, end_date }

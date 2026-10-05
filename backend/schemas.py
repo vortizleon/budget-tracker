@@ -737,3 +737,46 @@ class StatementResponse(BaseModel):
     financing_lines: List[StatementFinancingLineResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
+# Cost of debt (from imported statements)
+# ============================================================================
+
+class CostOfDebtMonth(BaseModel):
+    period: str  # "2026-09"
+    interest_crc: Decimal
+    insurance_crc: Decimal
+
+
+class CostOfDebtCard(BaseModel):
+    name: str
+    debt_crc: Decimal  # CRC-equivalent
+    interest_crc: Decimal
+    apr_crc: Optional[Decimal] = None
+    apr_usd: Optional[Decimal] = None
+
+
+class CostOfDebt(BaseModel):
+    has_data: bool
+    usd_to_crc_rate: Decimal
+    period: Optional[str] = None
+    statements_needing_review: int = 0
+    total_debt_crc: Optional[Decimal] = None   # CRC + USD balances, in CRC
+    debt_crc: Optional[Decimal] = None
+    debt_usd: Optional[Decimal] = None
+    interest_crc: Optional[Decimal] = None     # interest charged on the latest statements
+    insurance_crc: Optional[Decimal] = None    # optional insurance/services billed with the card
+    monthly_cost_crc: Optional[Decimal] = None
+    yearly_cost_crc: Optional[Decimal] = None
+    minimum_payment_crc: Optional[Decimal] = None
+    interest_share_of_minimum: Optional[Decimal] = None  # 0-1: how much of the minimum is just interest
+    average_rate: Optional[Decimal] = None     # balance-weighted % per year
+    highest_rate_currency: Optional[str] = None
+    apr_crc: Optional[Decimal] = None
+    apr_usd: Optional[Decimal] = None
+    monthly_income_crc: Optional[Decimal] = None
+    cost_share_of_income: Optional[Decimal] = None
+    future_installments_crc: Optional[Decimal] = None  # 0% installments not yet billed
+    cards: List[CostOfDebtCard] = []
+    history: List[CostOfDebtMonth] = []

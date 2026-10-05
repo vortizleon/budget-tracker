@@ -85,3 +85,21 @@ def test_upload_without_matching_card_warns_then_reparse_links_it(client):
 def test_upload_rejects_garbage(client):
     r = client.post("/api/statements/upload", files={"file": ("x.pdf", b"nope", "application/pdf")})
     assert r.status_code == 422
+
+
+def test_cost_of_debt_empty_then_from_statement(client):
+    assert client.get("/api/analytics/cost-of-debt").json()["has_data"] is False
+
+    client.post("/api/statements/upload", files={"file": ("s.pdf", make_pdf(statement_text()), "application/pdf")})
+    d = client.get("/api/analytics/cost-of-debt").json()
+    rate = float(d["usd_to_crc_rate"])
+    assert d["has_data"] and d["period"] == "2026-09"
+    # fixture: closing 3,500 CRC + 41 USD; interest 200 CRC + 1 USD; insurance 120 CRC
+    assert float(d["total_debt_crc"]) == pytest.approx(3500 + 41 * rate)
+    assert float(d["interest_crc"]) == pytest.approx(200 + 1 * rate)
+    assert float(d["monthly_cost_crc"]) == pytest.approx(200 + rate + 120)
+    assert float(d["yearly_cost_crc"]) == pytest.approx(12 * float(d["monthly_cost_crc"]))
+    assert d["highest_rate_currency"] == "CRC"            # 35.88% vs 29.64%
+    # 3 of 6 installments of $50 are still to come
+    assert float(d["future_installments_crc"]) == pytest.approx(3 * 50 * rate)
+    assert len(d["history"]) == 1

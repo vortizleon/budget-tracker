@@ -734,12 +734,102 @@ async function deleteIncome(incomeId) {
 
 async function loadCards() {
     try {
-        const cards = await API.Cards.getAll();
+        const [cards, costOfDebt] = await Promise.all([
+            API.Cards.getAll(),
+            API.Analytics.getCostOfDebt().catch(() => null),
+        ]);
         allCards = cards;
         renderCards(cards);
+        renderCostOfDebt(costOfDebt);
     } catch (error) {
         console.error('Failed to load cards:', error);
         showNotification(_t('Failed to load cards'), 'error');
+    }
+}
+
+// What card debt costs, from imported statements (interest + optional insurance).
+function renderCostOfDebt(d) {
+    const el = document.getElementById('debt-cost');
+    if (!d) {
+        el.innerHTML = '';
+        return;
+    }
+    if (!d.has_data) {
+        el.innerHTML = `<div class="debt-cost debt-cost-empty"><strong>${_t('What does your debt cost?')}</strong>
+            <span class="field-hint">${_t('Upload your credit card statements in Settings to see how much interest and insurance you pay each month.')}</span>
+            <a href="/settings" onclick="event.preventDefault(); showView('settings')">${_t('Go to Settings')}</a></div>`;
+        return;
+    }
+    const money = (v) => `<span class="money-value">${formatCurrency(v, 'CRC')}</span>`;
+    const pct = (v, digits = 1) => `${(parseFloat(v)).toFixed(digits)}%`;
+    const tile = (label, value, hint) => `<div class="debt-tile"><div class="debt-tile-label">${label}</div>
+        <div class="debt-tile-value">${value}</div>${hint ? `<div class="field-hint">${hint}</div>` : ''}</div>`;
+
+    const tiles = [
+        tile(_t('Total debt'), money(d.total_debt_crc),
+            `${formatCurrency(d.debt_crc, 'CRC')} + ${formatCurrency(d.debt_usd, 'USD')}`),
+        tile(_t('Cost per year'), money(d.yearly_cost_crc), _t('if nothing changes')),
+    ];
+    if (d.cost_share_of_income != null) {
+        tiles.push(tile(_t('Share of your income'), pct(parseFloat(d.cost_share_of_income) * 100), _t('goes to interest and insurance')));
+    }
+    if (d.average_rate != null) {
+        tiles.push(tile(_t('Average interest rate'), pct(d.average_rate), _t('per year, weighted by balance')));
+    }
+    if (d.interest_share_of_minimum != null) {
+        tiles.push(tile(_t('Minimum payment'), pct(parseFloat(d.interest_share_of_minimum) * 100, 0),
+            _t('of it is just interest - paying only the minimum barely dents the debt')));
+    }
+    if (parseFloat(d.future_installments_crc) > 0) {
+        tiles.push(tile(_t('0% installments still coming'), money(d.future_installments_crc), _t('not in the balance yet, but already committed')));
+    }
+
+    const advice = [];
+    if (d.highest_rate_currency && d.apr_crc != null && d.apr_usd != null && parseFloat(d.apr_crc) !== parseFloat(d.apr_usd)) {
+        const hi = d.highest_rate_currency;
+        advice.push(_t('{hi} debt costs {hiRate} a year against {loRate} on {lo} - put extra money toward the {hi} balance first.', {
+            hi, lo: hi === 'CRC' ? 'USD' : 'CRC',
+            hiRate: pct(hi === 'CRC' ? d.apr_crc : d.apr_usd, 2), loRate: pct(hi === 'CRC' ? d.apr_usd : d.apr_crc, 2),
+        }));
+    }
+    if (parseFloat(d.insurance_crc) > 0) {
+        advice.push(_t('{amount} a month is optional insurance and services billed to the card - cancel what you did not choose on purpose.', { amount: money(d.insurance_crc) }));
+    }
+    if (d.statements_needing_review > 0) {
+        advice.push(_t('{n} statement(s) need review in Settings - these numbers may be incomplete.', { n: d.statements_needing_review }));
+    }
+
+    const cardRows = d.cards.map(c => `<tr><td>${escapeHtml(c.name)}</td><td>${money(c.debt_crc)}</td><td>${money(c.interest_crc)}</td></tr>`).join('');
+    el.innerHTML = `
+        <div class="debt-cost">
+            <h3 class="debt-cost-headline">${_t('Your card debt costs {amount} a month', { amount: money(d.monthly_cost_crc) })}</h3>
+            <div class="field-hint">${_t('Interest {interest} + insurance {insurance}, from your {period} statements. Dollars converted at ₡{rate}.', {
+                interest: money(d.interest_crc), insurance: money(d.insurance_crc), period: d.period, rate: parseFloat(d.usd_to_crc_rate),
+            })}</div>
+            <div class="debt-tiles">${tiles.join('')}</div>
+            ${advice.length ? `<ul class="debt-advice">${advice.map(a => `<li>${a}</li>`).join('')}</ul>` : ''}
+            <table class="statement-table">
+                <tr><th>${_t('Card')}</th><th>${_t('Owed (in colones)')}</th><th>${_t('Interest this month')}</th></tr>
+                ${cardRows}
+            </table>
+            <div id="debt-cost-chart"></div>
+        </div>`;
+
+    if (d.history.length >= 2) {
+        renderChart('#debt-cost-chart', {
+            series: [
+                { name: _t('Interest'), data: d.history.map(h => Math.round(parseFloat(h.interest_crc))) },
+                { name: _t('Insurance'), data: d.history.map(h => Math.round(parseFloat(h.insurance_crc))) },
+            ],
+            chart: { type: 'bar', stacked: true, height: 240 },
+            xaxis: { categories: d.history.map(h => h.period) },
+            yaxis: { labels: { formatter: (v) => v.toLocaleString(I18N.locale()) } },
+            dataLabels: { enabled: false },
+            colors: ['#EF4444', '#F59E0B'],
+        });
+    } else {
+        document.getElementById('debt-cost-chart').innerHTML =
+            `<p class="field-hint">${_t('Upload more months of statements to see the trend - the goal is for this bar to shrink.')}</p>`;
     }
 }
 

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from . import models, schemas, crud, analytics, budgets, payoff, forecast, gmail_client, statements, statement_parser
+from . import models, schemas, crud, analytics, budgets, payoff, forecast, gmail_client, statements, statement_parser, debt
 from .database import get_db, init_db
 from .sync import TransactionSyncer
 
@@ -579,6 +579,12 @@ def get_spending_by_card(
 ):
     """Get per-card spending, optionally limited to a date range."""
     return analytics.get_spending_by_card(db, start_date=start_date, end_date=end_date)
+
+
+@app.get("/api/analytics/cost-of-debt", response_model=schemas.CostOfDebt)
+def get_cost_of_debt(db: Session = Depends(get_db)):
+    """What card debt costs per month (interest + insurance), from imported statements."""
+    return debt.get_cost_of_debt(db)
 
 
 @app.get("/api/analytics/month-forecast", response_model=schemas.MonthForecast)
