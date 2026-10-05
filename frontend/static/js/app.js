@@ -107,7 +107,7 @@ async function reconnectFromBanner() {
 // so a reload stays put. Keep VIEWS in sync with SPA_VIEWS in api.py.
 // ============================================================================
 
-const VIEWS = ['dashboard', 'budgets', 'transactions', 'analytics', 'forecast', 'categories', 'cards', 'settings'];
+const VIEWS = ['dashboard', 'budgets', 'transactions', 'analytics', 'forecast', 'categories', 'cards', 'debt', 'settings'];
 
 function viewFromPath() {
     const name = window.location.pathname.replace(/^\/+|\/+$/g, '');
@@ -265,6 +265,9 @@ async function showView(viewName, { push = true } = {}) {
             break;
         case 'cards':
             await loadCards();
+            break;
+        case 'debt':
+            await loadDebt();
             break;
         case 'transactions':
             populateTransactionFilterOptions();
@@ -734,16 +737,146 @@ async function deleteIncome(incomeId) {
 
 async function loadCards() {
     try {
-        const [cards, costOfDebt] = await Promise.all([
-            API.Cards.getAll(),
-            API.Analytics.getCostOfDebt().catch(() => null),
-        ]);
+        const cards = await API.Cards.getAll();
         allCards = cards;
         renderCards(cards);
-        renderCostOfDebt(costOfDebt);
     } catch (error) {
         console.error('Failed to load cards:', error);
         showNotification(_t('Failed to load cards'), 'error');
+    }
+}
+
+// ============================================================================
+// Debt view: where each card stands, report a payment, what the debt costs
+// ============================================================================
+
+async function loadDebt() {
+    try {
+        const [positions, payments, costOfDebt, cards] = await Promise.all([
+            API.Debt.getPositions(),
+            API.Debt.getPayments(),
+            API.Analytics.getCostOfDebt().catch(() => null),
+            API.Cards.getAll(),
+        ]);
+        allCards = cards;
+        renderPositions(positions);
+        renderPaymentForm(cards);
+        renderPayments(payments);
+        renderCostOfDebt(costOfDebt);
+    } catch (error) {
+        console.error('Failed to load debt:', error);
+        showNotification(_t('Failed to load debt'), 'error');
+    }
+}
+
+function renderPositions(list) {
+    const el = document.getElementById('debt-positions');
+    if (!list.length) {
+        el.innerHTML = `<div class="debt-cost debt-cost-empty"><strong>${_t('Nothing to show yet')}</strong>
+            <span class="field-hint">${_t('Upload your credit card statements in Settings to see what you owe on each card.')}</span>
+            <a href="/settings" onclick="event.preventDefault(); showView('settings')">${_t('Go to Settings')}</a></div>`;
+        return;
+    }
+    const money = (v, cur) => `<span class="money-value">${formatCurrency(v, cur)}</span>`;
+    const row = (label, crc, usd, bold) => {
+        if (parseFloat(crc) === 0 && parseFloat(usd) === 0 && !bold) return '';
+        return `<tr${bold ? ' class="statement-row-strong"' : ''}><td>${label}</td><td>${money(crc, 'CRC')}</td><td>${money(usd, 'USD')}</td></tr>`;
+    };
+    el.innerHTML = list.map(p => {
+        const due = p.cash_due_date ? formatDate(p.cash_due_date) : '';
+        let chip;
+        if (p.status === 'paid') {
+            chip = `<span class="statement-badge ok">✓ ${_t('Paid in full')}</span>`;
+        } else if (p.status === 'minimum_paid') {
+            chip = `<span class="statement-badge review">${_t('Minimum covered - interest applies to the rest')}</span>`;
+        } else {
+            const late = p.days_left != null && p.days_left < 0;
+            chip = `<span class="statement-badge ${late ? 'bad' : 'review'}">${late
+                ? _t('Overdue since {date}', { date: due })
+                : _t('Pay by {date}', { date: due })}</span>`;
+        }
+        const togo = (p.status === 'paid') ? '' : `
+            ${row(_t('Still to pay in full'), p.remaining_cash_crc, p.remaining_cash_usd, true)}
+            ${p.status === 'unpaid' ? row(_t('Of that, the minimum'), p.remaining_min_crc, p.remaining_min_usd) : ''}`;
+        return `
+        <div class="statement-item">
+            <div class="statement-head">
+                <strong>${escapeHtml(p.card_name)}</strong>
+                <span class="field-hint">${_t('{period} statement', { period: p.period })}</span>
+                ${chip}
+            </div>
+            <table class="statement-table">
+                <tr><th></th><th>CRC</th><th>USD</th></tr>
+                ${row(_t('Statement balance'), p.statement_balance_crc, p.statement_balance_usd)}
+                ${row(_t('Paid since'), p.payments_since_crc, p.payments_since_usd)}
+                ${row(_t('New purchases since'), p.purchases_since_crc, p.purchases_since_usd)}
+                ${row(_t('Owed now (estimate)'), p.balance_now_crc, p.balance_now_usd, true)}
+                ${togo}
+            </table>
+        </div>`;
+    }).join('');
+}
+
+function renderPaymentForm(cards) {
+    const select = document.getElementById('payment-card');
+    const previous = select.value;
+    select.innerHTML = cards.filter(c => c.card_type !== 'debit')
+        .map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    if (previous) select.value = previous;
+    const date = document.getElementById('payment-date');
+    if (!date.value) date.value = formatDateForInput(new Date());
+}
+
+function renderPayments(list) {
+    const el = document.getElementById('payments-list');
+    if (!list.length) {
+        el.innerHTML = '';
+        return;
+    }
+    el.innerHTML = `<table class="statement-table payments-table">
+        <tr><th>${_t('Date')}</th><th>${_t('Card')}</th><th>${_t('Amount')}</th><th></th></tr>
+        ${list.map(p => `<tr>
+            <td>${formatDate(p.date)}</td>
+            <td>${escapeHtml(p.card_name || '')}${p.notes ? ` <span class="field-hint">${escapeHtml(p.notes)}</span>` : ''}</td>
+            <td><span class="money-value">${formatCurrency(p.amount, p.currency)}</span></td>
+            <td>${p.logged_by_hand
+                ? `<button class="icon-btn" onclick="removePayment(${p.id})" title="${_t('Delete')}">🗑️</button>`
+                : `<span class="field-hint">${_t('from bank email')}</span>`}</td>
+        </tr>`).join('')}
+    </table>`;
+}
+
+async function submitPayment(event) {
+    event.preventDefault();
+    const btn = document.getElementById('payment-submit');
+    btn.disabled = true;
+    try {
+        await API.Debt.logPayment({
+            card_id: parseInt(document.getElementById('payment-card').value),
+            amount: document.getElementById('payment-amount').value,
+            currency: document.getElementById('payment-currency').value,
+            date: document.getElementById('payment-date').value,
+            notes: document.getElementById('payment-notes').value || null,
+        });
+        document.getElementById('payment-amount').value = '';
+        document.getElementById('payment-notes').value = '';
+        showNotification(_t('Payment logged'), 'success');
+        await loadDebt();
+    } catch (error) {
+        console.error('Log payment failed:', error);
+        showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function removePayment(id) {
+    try {
+        await API.Debt.deletePayment(id);
+        await loadDebt();
+    } catch (error) {
+        console.error('Delete payment failed:', error);
+        showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');
     }
 }
 
@@ -767,7 +900,10 @@ function renderCostOfDebt(d) {
 
     const tiles = [
         tile(_t('Total debt'), money(d.total_debt_crc),
-            `${formatCurrency(d.debt_crc, 'CRC')} + ${formatCurrency(d.debt_usd, 'USD')}`),
+            `${formatCurrency(d.debt_crc, 'CRC')} + ${formatCurrency(d.debt_usd, 'USD')}` +
+            (parseFloat(d.paid_since_crc) > 0
+                ? `<br>${_t('{statement} at the statement, less {paid} paid since', { statement: money(d.statement_debt_crc), paid: money(d.paid_since_crc) })}`
+                : '')),
         tile(_t('Cost per year'), money(d.yearly_cost_crc), _t('if nothing changes')),
     ];
     if (d.cost_share_of_income != null) {
@@ -920,7 +1056,7 @@ async function showPayoffPlan(cardId) {
             plan = planFromStatement(data.statement, {});
             data = await API.Cards.getPayoffPlan(cardId, plan.balance_as_of);
             hint = _t('Filled in from your {period} statement: balance, interest rate and minimum payment. Change the payment to see what paying more does.', { period: data.statement.period });
-        } else if (data.plan && data.statement && data.statement.cut_date > data.plan.balance_as_of) {
+        } else if (data.plan && data.statement && (data.statement.as_of || data.statement.cut_date) > data.plan.balance_as_of) {
             hint = `${_t('Your {period} statement is newer than this plan.', { period: data.statement.period })}
                 <button type="button" class="btn btn-secondary" onclick="applyStatementToPayoff()">${_t('Update balance and rates from the statement')}</button>`;
         }
@@ -968,7 +1104,7 @@ async function showPayoffPlan(cardId) {
 // preserve; with nothing to keep, the monthly payment starts at the statement's minimum.
 function planFromStatement(st, keep) {
     const plan = {
-        balance_as_of: st.cut_date,
+        balance_as_of: st.as_of || st.cut_date,
         balance_crc: st.balance_crc, balance_usd: st.balance_usd,
         annual_rate_crc: st.annual_rate_crc, annual_rate_usd: st.annual_rate_usd,
         monthly_payment_crc: st.min_payment_crc, monthly_payment_usd: st.min_payment_usd,
@@ -2770,6 +2906,8 @@ window.triggerRecategorize = triggerRecategorize;
 window.triggerReconnectGmail = triggerReconnectGmail;
 window.handleCredentialsFile = handleCredentialsFile;
 window.handleStatementFiles = handleStatementFiles;
+window.submitPayment = submitPayment;
+window.removePayment = removePayment;
 window.handleStatementDrop = handleStatementDrop;
 window.deleteStatement = deleteStatement;
 window.toggleStatementPaid = toggleStatementPaid;

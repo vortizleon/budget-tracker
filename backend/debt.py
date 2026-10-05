@@ -5,9 +5,11 @@ from them rather than being estimated. USD amounts are converted to CRC with
 the budget settings' exchange rate so totals can be compared and added.
 """
 from collections import defaultdict
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from . import budgets, models, schemas
@@ -22,6 +24,148 @@ def _d(value) -> Decimal:
 
 def _crc(crc, usd, rate: Decimal) -> Decimal:
     return _d(crc) + _d(usd) * rate
+
+
+def _sum_since(db: Session, card_id: int, kind: str, currency: str, after: date, today: date) -> Decimal:
+    """Total of a card's purchases/payments dated after the statement cut (up to today)."""
+    total = db.query(func.sum(models.Transaction.amount)).filter(
+        models.Transaction.card_id == card_id,
+        models.Transaction.transaction_type == kind,
+        models.Transaction.currency == currency,
+        models.Transaction.date > after,
+        models.Transaction.date <= today,
+    ).scalar()
+    return _d(total)
+
+
+def latest_statements(db: Session) -> List[models.Statement]:
+    """The newest statement of each card account."""
+    latest = {}
+    for row in db.query(models.Statement).order_by(models.Statement.period).all():
+        latest[(row.bank, row.account_last4)] = row
+    return list(latest.values())
+
+
+def position_for(db: Session, st: models.Statement, today: date) -> schemas.CardPosition:
+    """Where a card stands now: its latest statement, minus the payments made
+    since it was cut, plus the purchases since. Payments are in the currency of
+    the balance they pay (colones pay colones, dollars pay dollars)."""
+    cut = st.cut_date or today
+    pay = {"CRC": ZERO, "USD": ZERO}
+    buy = {"CRC": ZERO, "USD": ZERO}
+    if st.card_id is not None:
+        for cur in pay:
+            pay[cur] = _sum_since(db, st.card_id, "payment", cur, cut, today)
+            buy[cur] = _sum_since(db, st.card_id, "purchase", cur, cut, today)
+
+    def f(prefix, cur):
+        return _d(getattr(st, f"{prefix}_{cur.lower()}"))
+
+    vals = {}
+    for cur in ("CRC", "USD"):
+        c = cur.lower()
+        vals[f"statement_balance_{c}"] = f("closing_balance", cur)
+        vals[f"payments_since_{c}"] = pay[cur]
+        vals[f"purchases_since_{c}"] = buy[cur]
+        vals[f"balance_now_{c}"] = f("closing_balance", cur) - pay[cur] + buy[cur]
+        vals[f"min_payment_{c}"] = f("min_payment", cur)
+        vals[f"cash_payment_{c}"] = f("cash_payment", cur)
+        vals[f"remaining_min_{c}"] = max(f("min_payment", cur) - pay[cur], ZERO)
+        vals[f"remaining_cash_{c}"] = max(f("cash_payment", cur) - pay[cur], ZERO)
+
+    if st.paid_on is not None or (vals["remaining_cash_crc"] == 0 and vals["remaining_cash_usd"] == 0):
+        status = "paid"
+    elif vals["remaining_min_crc"] == 0 and vals["remaining_min_usd"] == 0:
+        status = "minimum_paid"
+    else:
+        status = "unpaid"
+
+    return schemas.CardPosition(
+        card_id=st.card_id or 0,
+        card_name=st.card.name if st.card else f"••••{st.account_last4}",
+        period=st.period, cut_date=st.cut_date, cash_due_date=st.cash_due_date,
+        days_left=(st.cash_due_date - today).days if st.cash_due_date else None,
+        status=status, paid_by_hand_on=st.paid_on, **vals,
+    )
+
+
+def get_positions(db: Session, today: Optional[date] = None) -> List[schemas.CardPosition]:
+    today = today or date.today()
+    return sorted(
+        (position_for(db, st, today) for st in latest_statements(db)),
+        key=lambda p: (p.days_left is None, p.days_left if p.days_left is not None else 0),
+    )
+
+
+def position_for_card(db: Session, card_id: int, today: Optional[date] = None) -> Optional[schemas.CardPosition]:
+    today = today or date.today()
+    for st in latest_statements(db):
+        if st.card_id == card_id:
+            return position_for(db, st, today)
+    return None
+
+
+# ---- payments the user reports ------------------------------------------------
+
+MANUAL_PAYMENT_NAME = "Card payment (logged by hand)"
+
+
+def _payment_response(t: models.Transaction) -> schemas.PaymentResponse:
+    return schemas.PaymentResponse(
+        id=t.id, card_id=t.card_id, card_name=t.card.name if t.card else None,
+        date=t.date, amount=t.amount, currency=t.currency, notes=t.notes,
+        logged_by_hand=t.gmail_message_id is None,
+    )
+
+
+def log_payment(db: Session, data: schemas.PaymentCreate) -> schemas.PaymentResponse:
+    t = models.Transaction(
+        date=data.date, amount=data.amount, currency=data.currency,
+        commerce_name=MANUAL_PAYMENT_NAME, transaction_type="payment",
+        card_id=data.card_id, notes=data.notes,
+    )
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return _payment_response(t)
+
+
+def list_payments(db: Session, card_id: Optional[int] = None, limit: int = 30) -> List[schemas.PaymentResponse]:
+    query = db.query(models.Transaction).filter(models.Transaction.transaction_type == "payment",
+                                                models.Transaction.card_id.isnot(None))
+    if card_id is not None:
+        query = query.filter(models.Transaction.card_id == card_id)
+    rows = query.order_by(models.Transaction.date.desc(), models.Transaction.id.desc()).limit(limit).all()
+    return [_payment_response(t) for t in rows]
+
+
+def delete_payment(db: Session, payment_id: int) -> str:
+    """"deleted", "not_found", or "not_manual" (bank-email payments aren't removed here)."""
+    t = db.get(models.Transaction, payment_id)
+    if t is None or t.transaction_type != "payment":
+        return "not_found"
+    if t.gmail_message_id is not None:
+        return "not_manual"
+    db.delete(t)
+    db.commit()
+    return "deleted"
+
+
+def manual_payment_exists(db: Session, card_id: Optional[int], currency: str, amount, on: date) -> bool:
+    """A hand-logged payment matching one that a bank email is about to add
+    (same card, currency and amount, within 3 days) - so it isn't counted twice."""
+    if card_id is None:
+        return False
+    on = on.date() if hasattr(on, "date") and callable(on.date) else on   # datetime -> date
+    return db.query(models.Transaction.id).filter(
+        models.Transaction.transaction_type == "payment",
+        models.Transaction.gmail_message_id.is_(None),
+        models.Transaction.card_id == card_id,
+        models.Transaction.currency == currency,
+        models.Transaction.amount == amount,
+        models.Transaction.date >= on - timedelta(days=3),
+        models.Transaction.date <= on + timedelta(days=3),
+    ).first() is not None
 
 
 def get_cost_of_debt(db: Session) -> schemas.CostOfDebt:
@@ -48,24 +192,31 @@ def get_cost_of_debt(db: Session) -> schemas.CostOfDebt:
 
     latest_period = periods[-1]
     latest = by_period[latest_period]
+    today = date.today()
+    positions = {st.id: position_for(db, st, today) for st in latest}
 
     cards = []
     total_debt = interest = insurance = minimum = ZERO
+    statement_debt = paid_since = ZERO
     debt_crc = debt_usd = ZERO
     weighted_rate_num = ZERO
     future_installments = ZERO
     for st in latest:
-        card_debt = _crc(st.closing_balance_crc, st.closing_balance_usd, rate)
+        pos = positions[st.id]
+        # What's owed now: the statement balance less payments since (never below zero).
+        now_crc, now_usd = max(pos.balance_now_crc, ZERO), max(pos.balance_now_usd, ZERO)
+        card_debt = now_crc + now_usd * rate
         card_interest = _crc(st.interest_crc, st.interest_usd, rate)
         total_debt += card_debt
-        debt_crc += _d(st.closing_balance_crc)
-        debt_usd += _d(st.closing_balance_usd)
+        debt_crc += now_crc
+        debt_usd += now_usd
+        statement_debt += _crc(st.closing_balance_crc, st.closing_balance_usd, rate)
+        paid_since += pos.payments_since_crc + pos.payments_since_usd * rate
         interest += card_interest
         insurance += _crc(st.insurance_crc, st.insurance_usd, rate)
         minimum += _crc(st.min_payment_crc, st.min_payment_usd, rate)
         weighted_rate_num += (
-            _d(st.closing_balance_crc) * _d(st.apr_crc)
-            + _d(st.closing_balance_usd) * rate * _d(st.apr_usd)
+            now_crc * _d(st.apr_crc) + now_usd * rate * _d(st.apr_usd)
         )
         for fl in st.financing_lines:
             if fl.installments_total and fl.installment_number and fl.installment_amount:
@@ -106,6 +257,8 @@ def get_cost_of_debt(db: Session) -> schemas.CostOfDebt:
         apr_usd=apr_usd or None,
         monthly_income_crc=income,
         cost_share_of_income=(monthly_cost / income if income and income > 0 else None),
+        statement_debt_crc=statement_debt,
+        paid_since_crc=paid_since,
         future_installments_crc=future_installments,
         cards=cards,
         history=history,

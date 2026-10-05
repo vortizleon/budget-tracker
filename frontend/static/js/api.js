@@ -649,6 +649,26 @@ const MaintenanceAPI = {
 // Google credentials API
 // ============================================================================
 
+const DebtAPI = {
+    /** Each card's latest statement adjusted for payments/purchases since. */
+    async getPositions() {
+        return apiRequest('/api/debt/positions');
+    },
+
+    async getPayments() {
+        return apiRequest('/api/payments');
+    },
+
+    /** @param {object} payment - {card_id, amount, currency, date, notes} */
+    async logPayment(payment) {
+        return apiRequest('/api/payments', { method: 'POST', body: JSON.stringify(payment) });
+    },
+
+    async deletePayment(id) {
+        return apiRequest(`/api/payments/${id}`, { method: 'DELETE' });
+    },
+};
+
 const StatementsAPI = {
     /** @returns {Promise<Array>} Stored statements, newest first */
     async getAll() {
@@ -783,6 +803,7 @@ window.API = {
     Maintenance: MaintenanceAPI,
     Credentials: CredentialsAPI,
     Statements: StatementsAPI,
+    Debt: DebtAPI,
     Budgets: BudgetsAPI,
     Income: IncomeAPI,
 };

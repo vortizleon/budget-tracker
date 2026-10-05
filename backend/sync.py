@@ -12,6 +12,7 @@ from backend.database import SessionLocal, init_db
 from backend.models import Transaction, Card, Category, EmailSource, CategorizationRule
 from backend.gmail_client import GmailClient
 from backend.email_parser import EmailParser
+from backend import debt
 
 
 class TransactionSyncer:
@@ -165,6 +166,13 @@ class TransactionSyncer:
 
         # Find card
         card_id = self.find_card_by_last_four(parsed_data.get('card_last_four'))
+
+        # A payment the user already logged by hand shouldn't be added again
+        # when the bank's own email for it arrives.
+        if parsed_data['transaction_type'] == 'payment' and debt.manual_payment_exists(
+            self.db, card_id, parsed_data['currency'], parsed_data['amount'], parsed_data['date']
+        ):
+            return False
 
         # Find or create category (an explicit hint, e.g. the recurring rent
         # transfer, overrides the default "Uncategorized" bucket)

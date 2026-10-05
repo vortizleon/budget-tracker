@@ -623,9 +623,12 @@ class CardPayoffPlanUpdate(BaseModel):
 
 
 class StatementSnapshot(BaseModel):
-    """The card's latest bank statement, offered as the source for payoff-plan numbers."""
+    """The card's latest bank statement, offered as the source for payoff-plan numbers.
+    balance_* is the statement balance minus the payments logged since it was cut;
+    as_of is today when payments were logged, otherwise the cut date."""
     period: str
     cut_date: Optional[date] = None
+    as_of: Optional[date] = None
     balance_crc: Optional[Decimal] = None
     balance_usd: Optional[Decimal] = None
     annual_rate_crc: Optional[Decimal] = None
@@ -791,6 +794,8 @@ class CostOfDebt(BaseModel):
     apr_usd: Optional[Decimal] = None
     monthly_income_crc: Optional[Decimal] = None
     cost_share_of_income: Optional[Decimal] = None
+    statement_debt_crc: Optional[Decimal] = None   # total at the statement cut, before payments since
+    paid_since_crc: Optional[Decimal] = None       # payments logged since the statements were cut
     future_installments_crc: Optional[Decimal] = None  # 0% installments not yet billed
     cards: List[CostOfDebtCard] = []
     history: List[CostOfDebtMonth] = []
@@ -812,3 +817,55 @@ class DueStatement(BaseModel):
 
 class StatementPaid(BaseModel):
     paid: bool = True
+
+
+# ============================================================================
+# Card payments and where each card stands now
+# ============================================================================
+
+class PaymentCreate(BaseModel):
+    """A payment the user made toward a card (logged by hand)."""
+    card_id: int
+    amount: Decimal = Field(gt=0)
+    currency: str
+    date: date
+    notes: Optional[str] = None
+
+
+class PaymentResponse(BaseModel):
+    id: int
+    card_id: Optional[int] = None
+    card_name: Optional[str] = None
+    date: date
+    amount: Decimal
+    currency: str
+    notes: Optional[str] = None
+    logged_by_hand: bool  # False = came from a bank email
+
+
+class CardPosition(BaseModel):
+    """Statement figures adjusted by what happened since the statement was cut."""
+    card_id: int
+    card_name: str
+    period: str
+    cut_date: Optional[date] = None
+    cash_due_date: Optional[date] = None
+    days_left: Optional[int] = None  # negative = past the due date
+    status: str  # "paid" | "minimum_paid" | "unpaid"
+    paid_by_hand_on: Optional[date] = None  # statement manually marked as paid
+    statement_balance_crc: Decimal
+    statement_balance_usd: Decimal
+    payments_since_crc: Decimal
+    payments_since_usd: Decimal
+    purchases_since_crc: Decimal
+    purchases_since_usd: Decimal
+    balance_now_crc: Decimal   # estimated: statement - payments + purchases since
+    balance_now_usd: Decimal
+    min_payment_crc: Decimal
+    min_payment_usd: Decimal
+    cash_payment_crc: Decimal
+    cash_payment_usd: Decimal
+    remaining_min_crc: Decimal
+    remaining_min_usd: Decimal
+    remaining_cash_crc: Decimal
+    remaining_cash_usd: Decimal

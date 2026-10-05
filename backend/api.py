@@ -62,7 +62,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "frontend" / "templates"))
 # Each sidebar view has its own URL (/budgets, /analytics, ...) so reloading
 # or sharing a link keeps you on that view - they all serve the same page and
 # app.js picks the view from the path. Keep in sync with VIEWS in app.js.
-SPA_VIEWS = ["budgets", "transactions", "analytics", "forecast", "categories", "cards", "settings"]
+SPA_VIEWS = ["budgets", "transactions", "analytics", "forecast", "categories", "cards", "debt", "settings"]
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -585,6 +585,39 @@ def get_spending_by_card(
 def get_cost_of_debt(db: Session = Depends(get_db)):
     """What card debt costs per month (interest + insurance), from imported statements."""
     return debt.get_cost_of_debt(db)
+
+
+@app.get("/api/debt/positions", response_model=List[schemas.CardPosition])
+def get_debt_positions(db: Session = Depends(get_db)):
+    """Each card's latest statement adjusted for payments/purchases since it was cut."""
+    return debt.get_positions(db)
+
+
+@app.post("/api/payments", response_model=schemas.PaymentResponse, status_code=201)
+def log_card_payment(payment: schemas.PaymentCreate, db: Session = Depends(get_db)):
+    """Report a payment you made toward a card. It counts against the card's
+    latest statement (colones pay colones, dollars pay dollars)."""
+    if payment.currency not in ("CRC", "USD"):
+        raise HTTPException(status_code=400, detail="Currency must be CRC or USD")
+    if not crud.get_card(db, payment.card_id):
+        raise HTTPException(status_code=404, detail="Card not found")
+    return debt.log_payment(db, payment)
+
+
+@app.get("/api/payments", response_model=List[schemas.PaymentResponse])
+def list_card_payments(card_id: Optional[int] = None, limit: int = 30, db: Session = Depends(get_db)):
+    """Recent payments toward cards (hand-logged and from bank emails), newest first."""
+    return debt.list_payments(db, card_id=card_id, limit=min(limit, 200))
+
+
+@app.delete("/api/payments/{payment_id}")
+def delete_card_payment(payment_id: int, db: Session = Depends(get_db)):
+    result = debt.delete_payment(db, payment_id)
+    if result == "not_found":
+        raise HTTPException(status_code=404, detail="Payment not found")
+    if result == "not_manual":
+        raise HTTPException(status_code=400, detail="That payment came from a bank email - only payments you logged can be removed")
+    return {"deleted": True}
 
 
 @app.get("/api/analytics/month-forecast", response_model=schemas.MonthForecast)

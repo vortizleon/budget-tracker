@@ -60,6 +60,9 @@
                 <a href="/cards" data-view="cards" class="nav-link">
                     <span class="nav-text">Cards</span>
                 </a>
+                <a href="/debt" data-view="debt" class="nav-link">
+                    <span class="nav-text">Debt</span>
+                </a>
                 <a href="/settings" data-view="settings" class="nav-link">
                     <span class="nav-text">Settings</span>
                 </a>
@@ -203,11 +206,52 @@
                     </button>
                 </div>
 
-                <div id="debt-cost"></div>
-
                 <div id="cards-grid" class="cards-grid">
                     <p class="loading">Loading cards...</p>
                 </div>
+            </div>
+
+            <!-- View: Debt -->
+            <div id="view-debt" class="view">
+                <div class="view-header">
+                    <h2>Debt</h2>
+                </div>
+
+                <div id="debt-positions"></div>
+
+                <div class="settings-section" id="debt-payments-section">
+                    <h3>Report a payment</h3>
+                    <p class="field-hint">Paid a card from your bank's app? Log it here and everything updates: what you still owe, whether this month's payment is covered, your debt total and the payoff plan. Colones pay the colones balance and dollars pay the dollar balance.</p>
+                    <form id="payment-form" class="payment-form" onsubmit="submitPayment(event)">
+                        <div class="form-group">
+                            <label>Card</label>
+                            <select id="payment-card" class="input" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount</label>
+                            <input type="number" id="payment-amount" class="input money-value" min="0.01" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <select id="payment-currency" class="input">
+                                <option value="CRC">CRC</option>
+                                <option value="USD">USD</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" id="payment-date" class="input" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Note (optional)</label>
+                            <input type="text" id="payment-notes" class="input" maxlength="200">
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="payment-submit">Log payment</button>
+                    </form>
+                    <div id="payments-list"></div>
+                </div>
+
+                <div id="debt-cost"></div>
             </div>
 
             <!-- View: Transactions -->

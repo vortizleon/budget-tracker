@@ -68,17 +68,24 @@ def get_plan(db: Session, card_id: int, as_of: date = None) -> schemas.CardPayof
     plan = db.query(models.CardPayoffPlan).filter(models.CardPayoffPlan.card_id == card_id).first()
     crc, usd, days = get_avg_monthly_spend(db, card_id)
     installments = get_scheduled_installments(db, card_id, as_of or (plan.balance_as_of if plan else date.today()))
+    snapshot = None
+    from . import debt  # local import: debt.py builds on budgets, which imports this module's siblings
+    position = debt.position_for_card(db, card_id)
     latest = (
         db.query(models.Statement)
         .filter(models.Statement.card_id == card_id)
         .order_by(models.Statement.period.desc())
         .first()
     )
-    snapshot = None
-    if latest:
+    if latest and position:
+        paid_any = position.payments_since_crc > 0 or position.payments_since_usd > 0
         snapshot = schemas.StatementSnapshot(
             period=latest.period, cut_date=latest.cut_date,
-            balance_crc=latest.closing_balance_crc, balance_usd=latest.closing_balance_usd,
+            as_of=date.today() if paid_any else latest.cut_date,
+            # statement balance minus what was paid since (purchases since are
+            # covered by the plan's own "new spending" estimate)
+            balance_crc=max(position.statement_balance_crc - position.payments_since_crc, Decimal(0)),
+            balance_usd=max(position.statement_balance_usd - position.payments_since_usd, Decimal(0)),
             annual_rate_crc=latest.apr_crc, annual_rate_usd=latest.apr_usd,
             min_payment_crc=latest.min_payment_crc, min_payment_usd=latest.min_payment_usd,
         )

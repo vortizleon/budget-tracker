@@ -468,3 +468,20 @@
     padding-left: 20px;
     font-size: 13px;
 }
+
+.statement-badge.bad {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.statement-row-strong td {
+    font-weight: 600;
+}
+
+.payment-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-md, 16px);
+    align-items: end;
+    margin-bottom: var(--spacing-md, 16px);
+}

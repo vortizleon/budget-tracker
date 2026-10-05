@@ -142,3 +142,72 @@ def test_payoff_plan_offers_latest_statement_numbers(client):
     assert snap["period"] == "2026-09" and snap["cut_date"] == "2026-09-18"
     assert snap["balance_crc"] == "3500.00" and snap["balance_usd"] == "41.00"
     assert snap["annual_rate_crc"] == "35.8800" and snap["min_payment_crc"] == "1000.00"
+
+
+def _upload_with_card(client):
+    card = client.post("/api/cards", json={"name": "Test Amex", "last_four": "1112", "color": "#112233"}).json()
+    client.post("/api/statements/upload", files={"file": ("s.pdf", make_pdf(statement_text()), "application/pdf")})
+    return card
+
+
+def test_logged_payments_update_position_status_and_debt(client):
+    card = _upload_with_card(client)
+    [pos] = client.get("/api/debt/positions").json()
+    # fixture: closing 3,500 CRC / 41 USD, minimum 1,000 / 6, pay-in-full 3,300 / 40
+    assert pos["status"] == "unpaid" and float(pos["balance_now_crc"]) == 3500
+    debt_before = float(client.get("/api/analytics/cost-of-debt").json()["total_debt_crc"])
+
+    # a payment dated before the statement was cut is already inside its balance
+    client.post("/api/payments", json={"card_id": card["id"], "amount": "999", "currency": "CRC", "date": "2026-09-10"})
+    assert float(client.get("/api/debt/positions").json()[0]["payments_since_crc"]) == 0
+
+    client.post("/api/payments", json={"card_id": card["id"], "amount": "1000", "currency": "CRC", "date": "2026-09-25"})
+    client.post("/api/payments", json={"card_id": card["id"], "amount": "6", "currency": "USD", "date": "2026-09-25"})
+    pos = client.get("/api/debt/positions").json()[0]
+    assert pos["status"] == "minimum_paid"
+    assert float(pos["balance_now_crc"]) == 2500 and float(pos["balance_now_usd"]) == 35
+    assert float(pos["remaining_cash_crc"]) == 2300 and float(pos["remaining_min_crc"]) == 0
+
+    d = client.get("/api/analytics/cost-of-debt").json()
+    assert float(d["total_debt_crc"]) < debt_before
+    assert float(d["paid_since_crc"]) > 0 and float(d["statement_debt_crc"]) == pytest.approx(debt_before)
+
+    client.post("/api/payments", json={"card_id": card["id"], "amount": "2300", "currency": "CRC", "date": "2026-10-01"})
+    client.post("/api/payments", json={"card_id": card["id"], "amount": "34", "currency": "USD", "date": "2026-10-01"})
+    assert client.get("/api/debt/positions").json()[0]["status"] == "paid"
+
+    # the payoff planner starts from the balance after those payments
+    snap = client.get(f"/api/cards/{card['id']}/payoff-plan").json()["statement"]
+    assert float(snap["balance_crc"]) == 200 and snap["as_of"] != snap["cut_date"]
+
+
+def test_payment_validation_and_delete(client):
+    card = _upload_with_card(client)
+    bad = client.post("/api/payments", json={"card_id": card["id"], "amount": "0", "currency": "CRC", "date": "2026-10-01"})
+    assert bad.status_code == 422
+    assert client.post("/api/payments", json={"card_id": card["id"], "amount": "5", "currency": "EUR", "date": "2026-10-01"}).status_code == 400
+    assert client.post("/api/payments", json={"card_id": 9999, "amount": "5", "currency": "CRC", "date": "2026-10-01"}).status_code == 404
+
+    made = client.post("/api/payments", json={"card_id": card["id"], "amount": "50", "currency": "CRC", "date": "2026-10-01"}).json()
+    assert made["logged_by_hand"] is True and made["card_name"] == "Test Amex"
+    assert [p["id"] for p in client.get("/api/payments").json()] == [made["id"]]
+    assert client.delete(f"/api/payments/{made['id']}").status_code == 200
+    assert client.get("/api/payments").json() == []
+    assert client.delete(f"/api/payments/{made['id']}").status_code == 404
+
+
+def test_bank_email_payment_is_not_double_counted(client):
+    from datetime import date
+    from decimal import Decimal
+    from backend import debt
+    from backend.database import SessionLocal
+    card = _upload_with_card(client)
+    client.post("/api/payments", json={"card_id": card["id"], "amount": "1000", "currency": "CRC", "date": "2026-09-25"})
+    db = SessionLocal()
+    try:
+        assert debt.manual_payment_exists(db, card["id"], "CRC", Decimal("1000"), date(2026, 9, 27))      # within 3 days
+        assert not debt.manual_payment_exists(db, card["id"], "CRC", Decimal("1000"), date(2026, 10, 5))  # too far
+        assert not debt.manual_payment_exists(db, card["id"], "CRC", Decimal("1001"), date(2026, 9, 25))
+        assert not debt.manual_payment_exists(db, card["id"], "USD", Decimal("1000"), date(2026, 9, 25))
+    finally:
+        db.close()
