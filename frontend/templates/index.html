@@ -252,6 +252,16 @@
                 </div>
 
                 <div id="debt-cost"></div>
+
+                <div class="settings-section">
+                    <h3>Export for financial advice</h3>
+                    <p class="field-hint">Download everything in one file - income, what each card owes and costs, the statement history, Tasa Cero plans, budgets and spending - to share with an advisor or an AI assistant. It has no account numbers, card numbers or names, and no individual purchases unless you tick the box. It still shows your balances and income, so only share it with someone you trust.</p>
+                    <label class="export-option"><input type="checkbox" id="export-transactions"> <span>Include my transactions from the last 90 days (merchant names and amounts)</span></label>
+                    <div class="export-buttons">
+                        <button class="btn btn-primary" onclick="downloadSnapshot('md')">Download (Markdown)</button>
+                        <button class="btn btn-secondary" onclick="downloadSnapshot('json')">Download (JSON)</button>
+                    </div>
+                </div>
             </div>
 
             <!-- View: Transactions -->

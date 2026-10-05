@@ -1,4 +1,5 @@
 """Statement PDF import: parsing, cross-checks, storage, and graceful failure."""
+import json
 from decimal import Decimal
 
 import pytest
@@ -247,3 +248,35 @@ def test_cut_day_purchases_only_count_when_the_statement_lacks_them(client):
     assert float(pos["purchases_since_crc"]) == 777 + 100
     assert float(pos["purchases_since_usd"]) == pytest.approx(93.05)
     assert float(pos["balance_now_crc"]) == 3500 + 877
+
+
+def test_snapshot_export_has_the_numbers_and_no_identifiers(client):
+    card = client.post("/api/cards", json={"name": "Test Amex", "last_four": "7392", "color": "#112233"}).json()
+    client.post("/api/statements/upload", files={"file": ("s.pdf", make_pdf(statement_text(acct="7391", card="7392")), "application/pdf")})
+    client.post("/api/payments", json={"card_id": card["id"], "amount": "1000", "currency": "CRC", "date": "2026-09-25"})
+    _tx(client, card["id"], date="2026-09-22", amount="4321", commerce_name="SECRET SHOP", transaction_type="purchase")
+
+    md = client.get("/api/export/snapshot").text
+    js = client.get("/api/export/snapshot?format=json").json()
+    assert "Personal finance snapshot" in md and "Test Amex" in md
+    assert js["debt_summary"]["highest_rate_currency"] == "CRC"
+    [c] = js["cards"]
+    assert c["latest_statement"]["interest_rate_crc_pct"] == 35.88
+    assert c["position_now"]["status"] == "unpaid"   # the $6 dollar minimum is still open
+    assert c["position_now"]["paid_since_statement_crc"] == 1000.0
+    assert js["statement_history"][0]["interest_crc"] == 200.0
+    # no card/account numbers, and no transactions unless asked
+    for text in (md, json.dumps(js)):
+        assert "7391" not in text and "7392" not in text
+        assert "SECRET SHOP" not in text
+    with_tx = client.get("/api/export/snapshot?format=json&include_transactions=true").json()
+    assert any(t["merchant"] == "SECRET SHOP" for t in with_tx["transactions_last_90_days"])
+
+    r = client.get("/api/export/snapshot")
+    assert "attachment" in r.headers["content-disposition"] and r.headers["content-disposition"].endswith('.md"')
+    assert client.get("/api/export/snapshot?format=pdf").status_code == 400
+
+
+def test_snapshot_export_works_with_nothing_imported(client):
+    r = client.get("/api/export/snapshot")
+    assert r.status_code == 200 and "No bank statements imported" in r.text

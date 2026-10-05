@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 from sqlalchemy.orm import Session
@@ -16,7 +16,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from . import models, schemas, crud, analytics, budgets, payoff, forecast, gmail_client, statements, statement_parser, debt
+from . import models, schemas, crud, analytics, budgets, payoff, forecast, gmail_client, statements, statement_parser, debt, export
 from .database import get_db, init_db
 from .sync import TransactionSyncer
 
@@ -618,6 +618,19 @@ def delete_card_payment(payment_id: int, db: Session = Depends(get_db)):
     if result == "not_manual":
         raise HTTPException(status_code=400, detail="That payment came from a bank email - only payments you logged can be removed")
     return {"deleted": True}
+
+
+@app.get("/api/export/snapshot")
+def export_snapshot(format: str = "md", include_transactions: bool = False, db: Session = Depends(get_db)):
+    """Download a snapshot of debt, income, budgets and spending (for financial advice).
+    No account numbers or names; individual transactions only if asked for."""
+    if format not in ("md", "json"):
+        raise HTTPException(status_code=400, detail="format must be md or json")
+    snapshot = export.build_snapshot(db, include_transactions=include_transactions)
+    body, media = (export.to_markdown(snapshot), "text/markdown") if format == "md" else (export.to_json(snapshot), "application/json")
+    filename = f"budget-snapshot-{snapshot['generated_on']}.{format}"
+    return Response(content=body, media_type=f"{media}; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @app.get("/api/analytics/month-forecast", response_model=schemas.MonthForecast)

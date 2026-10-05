@@ -848,6 +848,12 @@ function renderPayments(list) {
     </table>`;
 }
 
+// The snapshot is a normal file download from the API (Content-Disposition: attachment).
+function downloadSnapshot(format) {
+    const withTransactions = document.getElementById('export-transactions').checked;
+    window.location.href = `/api/export/snapshot?format=${format}&include_transactions=${withTransactions}`;
+}
+
 async function submitPayment(event) {
     event.preventDefault();
     const btn = document.getElementById('payment-submit');
@@ -2923,6 +2929,7 @@ window.triggerReconnectGmail = triggerReconnectGmail;
 window.handleCredentialsFile = handleCredentialsFile;
 window.handleStatementFiles = handleStatementFiles;
 window.submitPayment = submitPayment;
+window.downloadSnapshot = downloadSnapshot;
 window.removePayment = removePayment;
 window.handleStatementDrop = handleStatementDrop;
 window.deleteStatement = deleteStatement;
