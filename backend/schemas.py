@@ -794,6 +794,7 @@ class CostOfDebt(BaseModel):
     apr_usd: Optional[Decimal] = None
     monthly_income_crc: Optional[Decimal] = None
     cost_share_of_income: Optional[Decimal] = None
+    projected_interest_crc: Optional[Decimal] = None  # a month of interest at what is owed now (APR / 12)
     statement_debt_crc: Optional[Decimal] = None   # total at the statement cut, before payments since
     paid_since_crc: Optional[Decimal] = None       # payments logged since the statements were cut
     future_installments_crc: Optional[Decimal] = None  # 0% installments not yet billed

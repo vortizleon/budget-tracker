@@ -519,3 +519,8 @@
     width: 48px;
     text-align: center;
 }
+
+/* Debt page: room between the card blocks and the sections below them */
+#debt-positions {
+    margin-bottom: var(--spacing-lg, 24px);
+}

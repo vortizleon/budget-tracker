@@ -935,6 +935,17 @@ function renderCostOfDebt(d) {
         advice.push(_t('{n} statement(s) need review in Settings - these numbers may be incomplete.', { n: d.statements_needing_review }));
     }
 
+    // The statement's cost is history; this follows what you owe today, so paying down moves it.
+    const projectedInterest = parseFloat(d.projected_interest_crc);
+    const projectedCost = projectedInterest + parseFloat(d.insurance_crc);
+    const statementCost = parseFloat(d.monthly_cost_crc);
+    const projectedLine = `<div class="debt-projection">${_t('At what you owe now, it would be about {amount} a month going forward{change}.', {
+        amount: money(projectedCost),
+        change: Math.abs(projectedCost - statementCost) >= 1
+            ? ` (${projectedCost < statementCost ? _t('{amount} less than the statement', { amount: money(statementCost - projectedCost) }) : _t('{amount} more than the statement', { amount: money(projectedCost - statementCost) })})`
+            : '',
+    })}</div>`;
+
     const cardRows = d.cards.map(c => `<tr><td>${escapeHtml(c.name)}</td><td>${money(c.debt_crc)}</td><td>${money(c.interest_crc)}</td></tr>`).join('');
     el.innerHTML = `
         <div class="debt-cost">
@@ -942,6 +953,7 @@ function renderCostOfDebt(d) {
             <div class="field-hint">${_t('Interest {interest} + insurance {insurance}, from your {period} statements. Dollars converted at ₡{rate}.', {
                 interest: money(d.interest_crc), insurance: money(d.insurance_crc), period: d.period, rate: parseFloat(d.usd_to_crc_rate),
             })}</div>
+            ${projectedLine}
             <div class="debt-tiles">${tiles.join('')}</div>
             ${advice.length ? `<ul class="debt-advice">${advice.map(a => `<li>${a}</li>`).join('')}</ul>` : ''}
             <table class="statement-table">

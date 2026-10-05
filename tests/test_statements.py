@@ -170,6 +170,9 @@ def test_logged_payments_update_position_status_and_debt(client):
 
     d = client.get("/api/analytics/cost-of-debt").json()
     assert float(d["total_debt_crc"]) < debt_before
+    # a month of interest at today's balance: 2,500 CRC @35.88% + 35 USD @29.64%, /12
+    assert float(d["projected_interest_crc"]) == pytest.approx(
+        (2500 * 0.3588 + 35 * float(d["usd_to_crc_rate"]) * 0.2964) / 12, rel=1e-4)
     assert float(d["paid_since_crc"]) > 0 and float(d["statement_debt_crc"]) == pytest.approx(debt_before)
 
     client.post("/api/payments", json={"card_id": card["id"], "amount": "2300", "currency": "CRC", "date": "2026-10-01"})

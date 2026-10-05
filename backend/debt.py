@@ -200,6 +200,7 @@ def get_cost_of_debt(db: Session) -> schemas.CostOfDebt:
     statement_debt = paid_since = ZERO
     debt_crc = debt_usd = ZERO
     weighted_rate_num = ZERO
+    projected_interest = ZERO
     future_installments = ZERO
     for st in latest:
         pos = positions[st.id]
@@ -218,6 +219,8 @@ def get_cost_of_debt(db: Session) -> schemas.CostOfDebt:
         weighted_rate_num += (
             now_crc * _d(st.apr_crc) + now_usd * rate * _d(st.apr_usd)
         )
+        # A month of interest at today's balance (annual rate / 12) - it drops as you pay.
+        projected_interest += (now_crc * _d(st.apr_crc) + now_usd * rate * _d(st.apr_usd)) / 100 / 12
         for fl in st.financing_lines:
             if fl.installments_total and fl.installment_number and fl.installment_amount:
                 left = max(fl.installments_total - fl.installment_number, 0)
@@ -257,6 +260,7 @@ def get_cost_of_debt(db: Session) -> schemas.CostOfDebt:
         apr_usd=apr_usd or None,
         monthly_income_crc=income,
         cost_share_of_income=(monthly_cost / income if income and income > 0 else None),
+        projected_interest_crc=projected_interest,
         statement_debt_crc=statement_debt,
         paid_since_crc=paid_since,
         future_installments_crc=future_installments,

@@ -252,3 +252,8 @@
     margin: 0 0 var(--spacing-md, 16px);
     padding-left: 20px;
 }
+
+.debt-projection {
+    margin-top: var(--spacing-sm, 8px);
+    font-weight: 500;
+}
