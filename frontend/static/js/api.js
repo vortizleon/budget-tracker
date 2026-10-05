@@ -670,11 +670,6 @@ const StatementsAPI = {
         return apiRequest(`/api/statements/${id}`, { method: 'DELETE' });
     },
 
-    /** Statements to pay within a week (or overdue) that aren't marked paid. */
-    async getDue() {
-        return apiRequest('/api/statements/due');
-    },
-
     async setPaid(id, paid) {
         return apiRequest(`/api/statements/${id}/paid`, { method: 'POST', body: JSON.stringify({ paid }) });
     },

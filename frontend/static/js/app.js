@@ -49,77 +49,10 @@ let lastGmailCheck = 0;
 
 function startGmailWatch() {
     checkGmailStatus();
-    checkDueStatements();
     setInterval(checkGmailStatus, GMAIL_CHECK_MS);
-    setInterval(checkDueStatements, GMAIL_CHECK_MS);
     // Coming back to the tab after a while is when a dead token matters most.
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && Date.now() - lastGmailCheck > 5 * 60 * 1000) {
-            checkGmailStatus();
-            checkDueStatements();
-        }
-    });
-}
-
-// ----------------------------------------------------------------------------
-// Payment due dates - from imported statements. Not marked paid = keep warning.
-// ----------------------------------------------------------------------------
-
-async function checkDueStatements() {
-    try {
-        setDueBanner(await API.Statements.getDue());
-    } catch (error) {
-        console.error('Due-date check failed:', error);
-    }
-}
-
-function setDueBanner(list) {
-    let banner = document.getElementById('due-banner');
-    if (!list.length) {
-        if (banner) banner.remove();
-        return;
-    }
-    if (!banner) {
-        banner = document.createElement('div');
-        banner.id = 'due-banner';
-        banner.className = 'gmail-banner due-banner';
-        document.querySelector('.main-content').prepend(banner);
-    }
-    const money = (crc, usd) => [
-        parseFloat(crc) > 0 ? formatCurrency(crc, 'CRC') : null,
-        parseFloat(usd) > 0 ? formatCurrency(usd, 'USD') : null,
-    ].filter(Boolean).join(' + ') || '-';
-    const overdue = list.some(d => d.days_left < 0);
-    banner.classList.toggle('overdue', overdue);
-    banner.innerHTML = '<div class="due-banner-body"></div>';
-    const body = banner.firstChild;
-    list.forEach(d => {
-        const when = d.days_left < 0
-            ? _tp(-d.days_left, 'was due {n} day ago', 'was due {n} days ago')
-            : (d.days_left === 0 ? _t('is due today') : _tp(d.days_left, 'is due in {n} day', 'is due in {n} days'));
-        const row = document.createElement('div');
-        row.className = 'due-row';
-        row.innerHTML = `<div><strong>${escapeHtml(d.card_name)}</strong> ${when} (${formatDate(d.cash_due_date)}).
-            <span class="field-hint">${_t('Minimum {min} - in full {full}. Paying only the minimum means interest on the whole balance.', {
-                min: money(d.min_payment_crc, d.min_payment_usd), full: money(d.cash_payment_crc, d.cash_payment_usd),
-            })}</span></div>`;
-        const btn = document.createElement('button');
-        btn.className = 'btn-primary';
-        btn.textContent = _t('Mark as paid');
-        btn.addEventListener('click', async () => {
-            btn.disabled = true;
-            try {
-                await API.Statements.setPaid(d.id, true);
-                await checkDueStatements();
-                if (currentView === 'settings') renderStatements(await API.Statements.getAll());
-            } catch (error) {
-                console.error('Mark paid failed:', error);
-                showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');
-                btn.disabled = false;
-            }
-        });
-        row.appendChild(btn);
-        body.appendChild(row);
+        if (!document.hidden && Date.now() - lastGmailCheck > 5 * 60 * 1000) checkGmailStatus();
     });
 }
 
@@ -143,7 +76,7 @@ function setGmailBanner(show) {
     banner = document.createElement('div');
     banner.id = 'gmail-banner';
     banner.className = 'gmail-banner';
-    banner.innerHTML = '<span class="gmail-banner-text"></span><button class="btn-primary" id="btn-gmail-banner"></button>';
+    banner.innerHTML = '<span class="gmail-banner-text"></span><button class="btn btn-primary" id="btn-gmail-banner"></button>';
     banner.querySelector('.gmail-banner-text').textContent = _t('Your Gmail login expired, so new transactions are not syncing.');
     const btn = banner.querySelector('button');
     btn.textContent = _t('Log in to Gmail');
@@ -2278,7 +2211,6 @@ async function toggleStatementPaid(id, paid) {
     try {
         await API.Statements.setPaid(id, paid);
         renderStatements(await API.Statements.getAll());
-        checkDueStatements();
     } catch (error) {
         console.error('Mark paid failed:', error);
         showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');

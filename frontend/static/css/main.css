@@ -1451,26 +1451,6 @@ details.maintenance-action .date-range-row .input {
     background: color-mix(in srgb, var(--warning) 12%, transparent);
 }
 
-/* Payment due banner: same shell as the Gmail banner, red once overdue */
-.due-banner.overdue {
-    border-color: var(--danger);
-    background: color-mix(in srgb, var(--danger) 12%, transparent);
-}
-
-.due-banner-body {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: 100%;
-}
-
-.due-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-
 .payoff-statement-hint:empty {
     display: none;
 }
