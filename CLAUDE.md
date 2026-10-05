@@ -7,7 +7,9 @@ on macOS; delivered as one pasted Terminal command (see `GUIA_DE_USO.md`) plus `
 ## Working rules
 - CI is advisory: never add required checks; keep the per-PR run fast; read it before merging (a red `main` happened twice).
 - Suggest, don't build: if you notice a portability / CI / delivery improvement, mention it to the owner instead of
-  implementing it. The owner keeps those suggestions in their own playbook repo, not here.
+  implementing it. The owner keeps those suggestions, the lessons log and CI/installer templates in their own playbook repo
+  (`vortizleon/claude-playbooks`: `backlogs/budget-tracker.md`, `.claude/skills/ship-small-apps/`), not here. It isn't
+  attached to every session; if it is, read the skill before delivery/CI/security work, and offer to append new lessons.
 - Say what you couldn't test. The cloud sandbox is Linux: no macOS, no real Gmail login. Headless Chromium is available
   for browser checks.
 - Verify before you claim: "unused / not installed / never read" needs a whole-repo search. Docs that describe Google's
