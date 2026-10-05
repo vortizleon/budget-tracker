@@ -36,6 +36,70 @@ async function initializeApp() {
     initPrivacyMode();
     loadInitialData();
     showView(viewFromPath(), { push: false });
+    startGmailWatch();
+}
+
+// ============================================================================
+// Gmail token watch - warn as soon as the stored login stops working, instead
+// of the user finding out when a sync fails.
+// ============================================================================
+
+const GMAIL_CHECK_MS = 30 * 60 * 1000;
+let lastGmailCheck = 0;
+
+function startGmailWatch() {
+    checkGmailStatus();
+    setInterval(checkGmailStatus, GMAIL_CHECK_MS);
+    // Coming back to the tab after a while is when a dead token matters most.
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && Date.now() - lastGmailCheck > 5 * 60 * 1000) checkGmailStatus();
+    });
+}
+
+async function checkGmailStatus() {
+    lastGmailCheck = Date.now();
+    try {
+        const { status } = await API.Sync.getGmailStatus();
+        setGmailBanner(status === 'needs_login');
+    } catch (error) {
+        console.error('Gmail status check failed:', error);   // server down etc. - say nothing
+    }
+}
+
+function setGmailBanner(show) {
+    let banner = document.getElementById('gmail-banner');
+    if (!show) {
+        if (banner) banner.remove();
+        return;
+    }
+    if (banner) return;
+    banner = document.createElement('div');
+    banner.id = 'gmail-banner';
+    banner.className = 'gmail-banner';
+    banner.innerHTML = '<span class="gmail-banner-text"></span><button class="btn-primary" id="btn-gmail-banner"></button>';
+    banner.querySelector('.gmail-banner-text').textContent = _t('Your Gmail login expired, so new transactions are not syncing.');
+    const btn = banner.querySelector('button');
+    btn.textContent = _t('Log in to Gmail');
+    btn.addEventListener('click', reconnectFromBanner);
+    document.querySelector('.main-content').prepend(banner);
+}
+
+async function reconnectFromBanner() {
+    const btn = document.getElementById('btn-gmail-banner');
+    btn.disabled = true;
+    setLabel(btn, _t('Waiting for login...'));
+    try {
+        showNotification(_t('A Google login is opening in your browser...'), 'info');
+        const result = await API.Sync.triggerSync();
+        reportSyncResult(result);
+        setGmailBanner(false);
+        await showView(currentView);
+    } catch (error) {
+        console.error('Gmail login failed:', error);
+        showNotification(_t('Sync failed: {error}', { error: _t(error.message) }), 'error');
+        btn.disabled = false;
+        setLabel(btn, _t('Log in to Gmail'));
+    }
 }
 
 // ============================================================================
@@ -1493,7 +1557,7 @@ async function loadAnalytics(filters = {}) {
             API.Analytics.getSpendingByCategory({ currency: 'USD', start_date, end_date }),
             API.Analytics.getTopMerchants({ currency: 'CRC', start_date, end_date, limit: 10 }),
             API.Analytics.getTopMerchants({ currency: 'USD', start_date, end_date, limit: 10 }),
-            API.Analytics.getCardUtilization(),
+            API.Analytics.getCardUtilization({ start_date, end_date }),
         ]);
 
         renderDailySpendingChart(dailyCrc, dailyUsd);
@@ -1699,11 +1763,21 @@ function renderCardUtilizationChart(data) {
                 trim: false
             }
         },
-        yaxis: {
-            labels: {
-                formatter: (val) => val.toLocaleString(I18N.locale())
+        // CRC amounts dwarf USD ones, so each currency gets its own axis (CRC left,
+        // USD right) - on a shared axis the USD bars are invisible.
+        yaxis: [
+            {
+                seriesName: _t('Spent (CRC)'),
+                title: { text: 'CRC', style: { color: '#4F46E5' } },
+                labels: { formatter: (val) => val.toLocaleString(I18N.locale()) }
+            },
+            {
+                seriesName: _t('Spent (USD)'),
+                opposite: true,
+                title: { text: 'USD', style: { color: '#10B981' } },
+                labels: { formatter: (val) => val.toLocaleString(I18N.locale()) }
             }
-        },
+        ],
         colors: ['#4F46E5', '#10B981']
     });
 }

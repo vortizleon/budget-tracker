@@ -501,11 +501,18 @@ const AnalyticsAPI = {
     },
 
     /**
-     * Get card utilization
+     * Get per-card spending
+     * @param {object} filters - { start_date, end_date }
      * @returns {Promise<Array>} Card utilization data
      */
-    async getCardUtilization() {
-        return apiRequest('/api/analytics/card-utilization');
+    async getCardUtilization(filters = {}) {
+        const params = new URLSearchParams();
+
+        if (filters.start_date) params.append('start_date', filters.start_date);
+        if (filters.end_date) params.append('end_date', filters.end_date);
+
+        const queryString = params.toString();
+        return apiRequest(queryString ? `/api/analytics/card-utilization?${queryString}` : '/api/analytics/card-utilization');
     },
 };
 
@@ -596,6 +603,11 @@ const SyncAPI = {
      */
     async getStatus() {
         return apiRequest('/api/sync/status');
+    },
+
+    /** @returns {Promise<object>} { status: 'ok' | 'needs_login' | 'unknown' | 'no_credentials' } */
+    async getGmailStatus() {
+        return apiRequest('/api/gmail/status');
     },
 };
 
