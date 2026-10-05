@@ -42,15 +42,14 @@ def port_in_use():
 def start_server():
     print(f"Starting server on port {PORT}...")
     log_path = BASE_DIR / ".server.log"
-    with open(log_path, "a") as log:
-        subprocess.Popen(
-            [str(BASE_DIR / "venv" / "bin" / "python"), "-m", "uvicorn", "backend.api:app",
-             "--host", "127.0.0.1", "--port", str(PORT)],
-            cwd=str(BASE_DIR),
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
+    # backend.serve writes the (rotating) log itself, so no stdout redirect.
+    subprocess.Popen(
+        [str(BASE_DIR / "venv" / "bin" / "python"), "-m", "backend.serve", "127.0.0.1", str(PORT)],
+        cwd=str(BASE_DIR),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
     for _ in range(30):
         if port_in_use():
             return True

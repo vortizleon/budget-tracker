@@ -121,43 +121,6 @@
     font-weight: 600;
 }
 
-/* Card Utilization Bar */
-.card-utilization {
-    margin-top: var(--spacing-sm);
-}
-
-.utilization-label {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.9);
-    margin-bottom: 4px;
-}
-
-.utilization-bar {
-    height: 6px;
-    background: rgba(255, 255, 255, 0.25);
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.utilization-fill {
-    height: 100%;
-    background: white;
-    border-radius: 3px;
-    transition: width 0.3s ease;
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
-}
-
-.utilization-fill.high {
-    background: var(--warning);
-}
-
-.utilization-fill.critical {
-    background: var(--danger);
-}
-
 /* Card Actions (Edit, Delete) */
 .card-actions {
     position: absolute;
