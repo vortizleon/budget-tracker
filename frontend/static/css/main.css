@@ -1450,3 +1450,7 @@ details.maintenance-action .date-range-row .input {
     border-radius: 8px;
     background: color-mix(in srgb, var(--warning) 12%, transparent);
 }
+
+.payoff-statement-hint:empty {
+    display: none;
+}

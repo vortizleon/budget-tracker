@@ -1,10 +1,11 @@
 """FastAPI application with REST API endpoints."""
+import json
 import threading
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 from sqlalchemy.orm import Session
@@ -15,7 +16,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from . import models, schemas, crud, analytics, budgets, payoff, forecast, gmail_client
+from . import models, schemas, crud, analytics, budgets, payoff, forecast, gmail_client, statements, statement_parser, debt, export
 from .database import get_db, init_db
 from .sync import TransactionSyncer
 
@@ -61,7 +62,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "frontend" / "templates"))
 # Each sidebar view has its own URL (/budgets, /analytics, ...) so reloading
 # or sharing a link keeps you on that view - they all serve the same page and
 # app.js picks the view from the path. Keep in sync with VIEWS in app.js.
-SPA_VIEWS = ["budgets", "transactions", "analytics", "forecast", "categories", "cards", "settings"]
+SPA_VIEWS = ["budgets", "transactions", "analytics", "forecast", "categories", "cards", "debt", "settings"]
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -580,6 +581,58 @@ def get_spending_by_card(
     return analytics.get_spending_by_card(db, start_date=start_date, end_date=end_date)
 
 
+@app.get("/api/analytics/cost-of-debt", response_model=schemas.CostOfDebt)
+def get_cost_of_debt(db: Session = Depends(get_db)):
+    """What card debt costs per month (interest + insurance), from imported statements."""
+    return debt.get_cost_of_debt(db)
+
+
+@app.get("/api/debt/positions", response_model=List[schemas.CardPosition])
+def get_debt_positions(db: Session = Depends(get_db)):
+    """Each card's latest statement adjusted for payments/purchases since it was cut."""
+    return debt.get_positions(db)
+
+
+@app.post("/api/payments", response_model=schemas.PaymentResponse, status_code=201)
+def log_card_payment(payment: schemas.PaymentCreate, db: Session = Depends(get_db)):
+    """Report a payment you made toward a card. It counts against the card's
+    latest statement (colones pay colones, dollars pay dollars)."""
+    if payment.currency not in ("CRC", "USD"):
+        raise HTTPException(status_code=400, detail="Currency must be CRC or USD")
+    if not crud.get_card(db, payment.card_id):
+        raise HTTPException(status_code=404, detail="Card not found")
+    return debt.log_payment(db, payment)
+
+
+@app.get("/api/payments", response_model=List[schemas.PaymentResponse])
+def list_card_payments(card_id: Optional[int] = None, limit: int = 30, db: Session = Depends(get_db)):
+    """Recent payments toward cards (hand-logged and from bank emails), newest first."""
+    return debt.list_payments(db, card_id=card_id, limit=min(limit, 200))
+
+
+@app.delete("/api/payments/{payment_id}")
+def delete_card_payment(payment_id: int, db: Session = Depends(get_db)):
+    result = debt.delete_payment(db, payment_id)
+    if result == "not_found":
+        raise HTTPException(status_code=404, detail="Payment not found")
+    if result == "not_manual":
+        raise HTTPException(status_code=400, detail="That payment came from a bank email - only payments you logged can be removed")
+    return {"deleted": True}
+
+
+@app.get("/api/export/snapshot")
+def export_snapshot(format: str = "md", include_transactions: bool = False, db: Session = Depends(get_db)):
+    """Download a snapshot of debt, income, budgets and spending (for financial advice).
+    No account numbers or names; individual transactions only if asked for."""
+    if format not in ("md", "json"):
+        raise HTTPException(status_code=400, detail="format must be md or json")
+    snapshot = export.build_snapshot(db, include_transactions=include_transactions)
+    body, media = (export.to_markdown(snapshot), "text/markdown") if format == "md" else (export.to_json(snapshot), "application/json")
+    filename = f"budget-snapshot-{snapshot['generated_on']}.{format}"
+    return Response(content=body, media_type=f"{media}; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
 @app.get("/api/analytics/month-forecast", response_model=schemas.MonthForecast)
 def get_month_forecast(db: Session = Depends(get_db)):
     """Projected month-end spending per category at the current pace."""
@@ -737,11 +790,13 @@ def get_card_billing_cycles(card_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/api/cards/{card_id}/payoff-plan", response_model=schemas.CardPayoffPlanResponse)
-def get_card_payoff_plan(card_id: int, db: Session = Depends(get_db)):
-    """A card's saved payoff plan (if any) and its recent monthly spend."""
+def get_card_payoff_plan(card_id: int, as_of: Optional[date] = None, db: Session = Depends(get_db)):
+    """A card's saved payoff plan (if any) and its recent monthly spend. `as_of`
+    computes the upcoming Tasa Cero charges from that date instead of the plan's
+    (used when the numbers are taken from a newer statement)."""
     if not crud.get_card(db, card_id):
         raise HTTPException(status_code=404, detail="Card not found")
-    return payoff.get_plan(db, card_id)
+    return payoff.get_plan(db, card_id, as_of=as_of)
 
 
 @app.put("/api/cards/{card_id}/payoff-plan", response_model=schemas.CardPayoffPlanResponse)
@@ -966,6 +1021,77 @@ def upload_credentials(upload: CredentialsUpload):
         token.unlink()
         token_removed = True
     return {"saved": True, "replaced": previous is not None, "token_removed": token_removed}
+
+
+# ============================================================================
+# Statements (bank estado de cuenta PDFs)
+# ============================================================================
+
+MAX_STATEMENT_BYTES = 15 * 1024 * 1024
+
+
+def _statement_response(row: models.Statement) -> schemas.StatementResponse:
+    response = schemas.StatementResponse.model_validate(row)
+    response.card_name = row.card.name if row.card else None
+    response.warnings = json.loads(row.warnings_json or "[]")
+    return response
+
+
+@app.post("/api/statements/upload", response_model=List[schemas.StatementResponse])
+def upload_statement(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Read a bank statement PDF and store one Statement per card account in it.
+    Re-uploading the same month updates it. A statement that doesn't add up (or
+    whose layout changed) is still saved but flagged needs_review with warnings."""
+    data = file.file.read(MAX_STATEMENT_BYTES + 1)
+    if len(data) > MAX_STATEMENT_BYTES:
+        raise HTTPException(status_code=413, detail="That file is too large for a statement.")
+    try:
+        rows = statements.import_pdf(db, data)
+    except statement_parser.StatementError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return [_statement_response(r) for r in rows]
+
+
+@app.get("/api/statements", response_model=List[schemas.StatementResponse])
+def list_statements(card_id: Optional[int] = None, db: Session = Depends(get_db)):
+    """Stored statements, newest first."""
+    query = db.query(models.Statement)
+    if card_id is not None:
+        query = query.filter(models.Statement.card_id == card_id)
+    rows = query.order_by(models.Statement.period.desc(), models.Statement.account_last4).all()
+    return [_statement_response(r) for r in rows]
+
+
+@app.get("/api/statements/due", response_model=List[schemas.DueStatement])
+def get_due_statements(db: Session = Depends(get_db)):
+    """Statements to pay soon (within a week) or overdue, not yet marked paid."""
+    return statements.due_soon(db)
+
+
+@app.post("/api/statements/{statement_id}/paid", response_model=schemas.StatementResponse)
+def mark_statement_paid(statement_id: int, body: schemas.StatementPaid, db: Session = Depends(get_db)):
+    """Mark a statement's payment as made (or undo it) - this hides the due-date banner."""
+    row = statements.set_paid(db, statement_id, body.paid)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    return _statement_response(row)
+
+
+@app.post("/api/statements/reparse", response_model=List[schemas.StatementResponse])
+def reparse_statements(db: Session = Depends(get_db)):
+    """Re-run the current parser over every stored statement (after a parser fix
+    or after fixing a card's last 4 digits), without uploading the PDFs again."""
+    return [_statement_response(r) for r in statements.reparse_all(db)]
+
+
+@app.delete("/api/statements/{statement_id}")
+def delete_statement(statement_id: int, db: Session = Depends(get_db)):
+    row = db.get(models.Statement, statement_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    db.delete(row)
+    db.commit()
+    return {"deleted": True}
 
 
 @app.get("/api/gmail/status")

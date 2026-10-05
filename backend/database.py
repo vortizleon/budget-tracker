@@ -44,6 +44,11 @@ def init_db():
 def _add_missing_columns():
     """create_all() only creates missing tables, not columns added to
     existing ones - add those here (idempotent, runs every startup)."""
+    statement_columns = {c["name"] for c in inspect(engine).get_columns("statements")}
+    if "paid_on" not in statement_columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE statements ADD COLUMN paid_on DATE"))
+
     columns = {c["name"] for c in inspect(engine).get_columns("budgets")}
     if "is_protected" not in columns:
         with engine.begin() as conn:

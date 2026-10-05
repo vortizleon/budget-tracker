@@ -622,6 +622,21 @@ class CardPayoffPlanUpdate(BaseModel):
     monthly_spend_usd: Optional[Decimal] = Field(default=None, ge=0)
 
 
+class StatementSnapshot(BaseModel):
+    """The card's latest bank statement, offered as the source for payoff-plan numbers.
+    balance_* is the statement balance minus the payments logged since it was cut;
+    as_of is today when payments were logged, otherwise the cut date."""
+    period: str
+    cut_date: Optional[date] = None
+    as_of: Optional[date] = None
+    balance_crc: Optional[Decimal] = None
+    balance_usd: Optional[Decimal] = None
+    annual_rate_crc: Optional[Decimal] = None
+    annual_rate_usd: Optional[Decimal] = None
+    min_payment_crc: Optional[Decimal] = None
+    min_payment_usd: Optional[Decimal] = None
+
+
 class CardPayoffPlanResponse(BaseModel):
     """A card's saved plan (plan=None if none yet) plus the recent average
     monthly spend on the card, used as the default spend estimate."""
@@ -634,6 +649,7 @@ class CardPayoffPlanResponse(BaseModel):
     # (index 0 = the as-of month) - added on top of the average spend.
     scheduled_installments_crc: List[Decimal] = []
     scheduled_installments_usd: List[Decimal] = []
+    statement: Optional[StatementSnapshot] = None  # latest imported statement for this card
 
 
 # ============================================================================
@@ -674,3 +690,185 @@ class MonthForecast(BaseModel):
     projected_spend: Decimal
     projected_left: Decimal  # income_base - projected_spend - total_debt
     lines: List[ForecastLine]
+
+
+# ============================================================================
+# Statements (bank estado de cuenta)
+# ============================================================================
+
+class StatementFinancingLineResponse(BaseModel):
+    merchant: Optional[str] = None
+    currency: Optional[str] = None
+    total_amount: Optional[Decimal] = None
+    term_months: Optional[int] = None
+    annual_rate: Optional[Decimal] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    installment_amount: Optional[Decimal] = None
+    installment_number: Optional[int] = None
+    installments_total: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StatementResponse(BaseModel):
+    id: int
+    card_id: Optional[int] = None
+    card_name: Optional[str] = None
+    bank: str
+    brand: Optional[str] = None
+    loyalty_plan: Optional[str] = None
+    account_last4: str
+    period: str
+    cut_date: Optional[date] = None
+    min_due_date: Optional[date] = None
+    cash_due_date: Optional[date] = None
+    limit_currency: Optional[str] = None
+    credit_limit: Optional[Decimal] = None
+    available: Optional[Decimal] = None
+    points_assigned: Optional[Decimal] = None
+    previous_balance_crc: Optional[Decimal] = None
+    previous_balance_usd: Optional[Decimal] = None
+    purchases_crc: Optional[Decimal] = None
+    purchases_usd: Optional[Decimal] = None
+    payments_crc: Optional[Decimal] = None
+    payments_usd: Optional[Decimal] = None
+    interest_crc: Optional[Decimal] = None
+    interest_usd: Optional[Decimal] = None
+    insurance_crc: Optional[Decimal] = None
+    insurance_usd: Optional[Decimal] = None
+    other_charges_crc: Optional[Decimal] = None
+    other_charges_usd: Optional[Decimal] = None
+    min_payment_crc: Optional[Decimal] = None
+    min_payment_usd: Optional[Decimal] = None
+    cash_payment_crc: Optional[Decimal] = None
+    cash_payment_usd: Optional[Decimal] = None
+    closing_balance_crc: Optional[Decimal] = None
+    closing_balance_usd: Optional[Decimal] = None
+    apr_crc: Optional[Decimal] = None
+    apr_usd: Optional[Decimal] = None
+    paid_on: Optional[date] = None
+    status: str
+    warnings: List[str] = []
+    parser_version: int
+    financing_lines: List[StatementFinancingLineResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
+# Cost of debt (from imported statements)
+# ============================================================================
+
+class CostOfDebtMonth(BaseModel):
+    period: str  # "2026-09"
+    interest_crc: Decimal
+    insurance_crc: Decimal
+
+
+class CostOfDebtCard(BaseModel):
+    name: str
+    debt_crc: Decimal  # CRC-equivalent
+    interest_crc: Decimal
+    apr_crc: Optional[Decimal] = None
+    apr_usd: Optional[Decimal] = None
+
+
+class CostOfDebt(BaseModel):
+    has_data: bool
+    usd_to_crc_rate: Decimal
+    period: Optional[str] = None
+    statements_needing_review: int = 0
+    total_debt_crc: Optional[Decimal] = None   # CRC + USD balances, in CRC
+    debt_crc: Optional[Decimal] = None
+    debt_usd: Optional[Decimal] = None
+    interest_crc: Optional[Decimal] = None     # interest charged on the latest statements
+    insurance_crc: Optional[Decimal] = None    # optional insurance/services billed with the card
+    monthly_cost_crc: Optional[Decimal] = None
+    yearly_cost_crc: Optional[Decimal] = None
+    minimum_payment_crc: Optional[Decimal] = None
+    interest_share_of_minimum: Optional[Decimal] = None  # 0-1: how much of the minimum is just interest
+    average_rate: Optional[Decimal] = None     # balance-weighted % per year
+    highest_rate_currency: Optional[str] = None
+    apr_crc: Optional[Decimal] = None
+    apr_usd: Optional[Decimal] = None
+    monthly_income_crc: Optional[Decimal] = None
+    cost_share_of_income: Optional[Decimal] = None
+    projected_interest_crc: Optional[Decimal] = None  # a month of interest at what is owed now (APR / 12)
+    statement_debt_crc: Optional[Decimal] = None   # total at the statement cut, before payments since
+    paid_since_crc: Optional[Decimal] = None       # payments logged since the statements were cut
+    future_installments_crc: Optional[Decimal] = None  # 0% installments not yet billed
+    cards: List[CostOfDebtCard] = []
+    history: List[CostOfDebtMonth] = []
+
+
+class DueStatement(BaseModel):
+    """A statement whose payment is due soon (or overdue) and not marked paid."""
+    id: int
+    card_name: str
+    account_last4: str
+    period: str
+    cash_due_date: date
+    days_left: int  # negative = overdue
+    min_payment_crc: Optional[Decimal] = None
+    min_payment_usd: Optional[Decimal] = None
+    cash_payment_crc: Optional[Decimal] = None
+    cash_payment_usd: Optional[Decimal] = None
+
+
+class StatementPaid(BaseModel):
+    paid: bool = True
+
+
+# ============================================================================
+# Card payments and where each card stands now
+# ============================================================================
+
+class PaymentCreate(BaseModel):
+    """A payment the user made toward a card (logged by hand)."""
+    card_id: int
+    amount: Decimal = Field(gt=0)
+    currency: str
+    date: date
+    notes: Optional[str] = None
+
+
+class PaymentResponse(BaseModel):
+    id: int
+    card_id: Optional[int] = None
+    card_name: Optional[str] = None
+    date: date
+    amount: Decimal
+    currency: str
+    notes: Optional[str] = None
+    logged_by_hand: bool  # False = came from a bank email
+
+
+class CardPosition(BaseModel):
+    """Statement figures adjusted by what happened since the statement was cut."""
+    card_id: int
+    card_name: str
+    period: str
+    cut_date: Optional[date] = None
+    cash_due_date: Optional[date] = None
+    days_left: Optional[int] = None  # negative = past the due date
+    status: str  # "paid" | "minimum_paid" | "unpaid"
+    paid_by_hand_on: Optional[date] = None  # statement manually marked as paid
+    statement_balance_crc: Decimal
+    statement_balance_usd: Decimal
+    payments_since_crc: Decimal
+    payments_since_usd: Decimal
+    purchases_since_crc: Decimal
+    purchases_since_usd: Decimal
+    rewards_since_crc: Decimal  # points redeemed since - a credit the bank applies later, not a payment
+    rewards_since_usd: Decimal
+    balance_now_crc: Decimal   # estimated: statement - payments + purchases since
+    balance_now_usd: Decimal
+    min_payment_crc: Decimal
+    min_payment_usd: Decimal
+    cash_payment_crc: Decimal
+    cash_payment_usd: Decimal
+    remaining_min_crc: Decimal
+    remaining_min_usd: Decimal
+    remaining_cash_crc: Decimal
+    remaining_cash_usd: Decimal

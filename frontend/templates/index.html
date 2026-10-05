@@ -60,6 +60,9 @@
                 <a href="/cards" data-view="cards" class="nav-link">
                     <span class="nav-text">Cards</span>
                 </a>
+                <a href="/debt" data-view="debt" class="nav-link">
+                    <span class="nav-text">Debt</span>
+                </a>
                 <a href="/settings" data-view="settings" class="nav-link">
                     <span class="nav-text">Settings</span>
                 </a>
@@ -156,11 +159,6 @@
                 </div>
 
                 <div class="settings-section">
-                    <h3>Card Debt This Month</h3>
-                    <div id="budget-debt-list"></div>
-                </div>
-
-                <div class="settings-section">
                     <h3>Income <span class="section-caption" id="budget-income-caption"></span></h3>
                     <div id="income-entries-list"></div>
                     <div class="budget-settings-row">
@@ -205,6 +203,70 @@
 
                 <div id="cards-grid" class="cards-grid">
                     <p class="loading">Loading cards...</p>
+                </div>
+            </div>
+
+            <!-- View: Debt -->
+            <div id="view-debt" class="view">
+                <div class="view-header">
+                    <h2>Debt</h2>
+                </div>
+
+                <div id="debt-positions"></div>
+
+                <div class="settings-section">
+                    <h3>Card Debt This Month</h3>
+                    <div id="budget-debt-list"></div>
+                </div>
+
+                <div class="settings-section" id="debt-payments-section">
+                    <h3>Report a payment</h3>
+                    <p class="field-hint">Paid a card from your bank's app? Log it here and everything updates: what you still owe, whether this month's payment is covered, your debt total and the payoff plan. Colones pay the colones balance and dollars pay the dollar balance.</p>
+                    <form id="payment-form" class="payment-form" onsubmit="submitPayment(event)">
+                        <div class="form-group">
+                            <label>Card</label>
+                            <select id="payment-card" class="input" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount</label>
+                            <input type="number" id="payment-amount" class="input money-value" min="0.01" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <select id="payment-currency" class="input">
+                                <option value="CRC">CRC</option>
+                                <option value="USD">USD</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" id="payment-date" class="input" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Note (optional)</label>
+                            <input type="text" id="payment-notes" class="input" maxlength="200">
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="payment-submit">Log payment</button>
+                    </form>
+                    <div id="payments-list"></div>
+                </div>
+
+                <div id="debt-cost"></div>
+
+                <div class="settings-section" id="statement-history-section" style="display: none;">
+                    <h3>Statement history</h3>
+                    <p class="field-hint">What each monthly statement showed. The goal is for interest and insurance to shrink.</p>
+                    <div id="statement-history"></div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Export for financial advice</h3>
+                    <p class="field-hint">Download everything in one file - income, what each card owes and costs, the statement history, Tasa Cero plans, budgets and spending - to share with an advisor or an AI assistant. It has no account numbers, card numbers or names, and no individual purchases unless you tick the box. It still shows your balances and income, so only share it with someone you trust.</p>
+                    <label class="export-option"><input type="checkbox" id="export-transactions"> <span>Include my transactions from the last 90 days (merchant names and amounts)</span></label>
+                    <div class="export-buttons">
+                        <button class="btn btn-primary" onclick="downloadSnapshot('md')">Download (Markdown)</button>
+                        <button class="btn btn-secondary" onclick="downloadSnapshot('json')">Download (JSON)</button>
+                    </div>
                 </div>
             </div>
 
@@ -399,6 +461,21 @@
                         <span>or click to choose it (the client_secret_....json you downloaded from Google)</span>
                     </label>
                     <p class="field-hint">Stays on this computer. After uploading, click "Sync Now" below to log in to Gmail.</p>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Bank statements</h3>
+                    <p class="field-hint">Upload the monthly statement PDF (estado de cuenta) from your bank. It is the bank's own record, so it shows what the emails can't: interest, insurance charges, the amount to pay in full, the due date and your real interest rate. If the bank changes the layout, a statement that doesn't add up is flagged for review instead of being trusted.</p>
+                    <label id="statement-dropzone" class="dropzone"
+                           ondragover="event.preventDefault(); this.classList.add('dragover')"
+                           ondragleave="this.classList.remove('dragover')"
+                           ondrop="handleStatementDrop(event)">
+                        <input type="file" id="statement-file" accept=".pdf,application/pdf" multiple
+                               onchange="handleStatementFiles(this.files)" hidden>
+                        <strong>Drop a statement PDF here</strong>
+                        <span>or click to choose one (you can pick several)</span>
+                    </label>
+                    <p class="field-hint">Stays on this computer.</p>
                 </div>
 
                 <div class="settings-section">
@@ -773,6 +850,7 @@
                         <label>Balances As Of</label>
                         <input type="date" id="payoff-as-of" class="input payoff-as-of" required oninput="renderPayoffProjection()">
                     </div>
+                    <div id="payoff-statement-hint" class="payoff-statement-hint"></div>
                     <div class="payoff-columns">
                         <div class="payoff-col">
                             <h4>CRC</h4>

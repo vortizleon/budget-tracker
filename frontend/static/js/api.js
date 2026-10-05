@@ -13,12 +13,14 @@ const API_BASE_URL = '';  // Empty for same-origin requests
 async function apiRequest(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
 
+    // A FormData body (file upload) needs the browser to set its own multipart Content-Type.
+    const isForm = options.body instanceof FormData;
     const config = {
+        ...options,
         headers: {
-            'Content-Type': 'application/json',
+            ...(isForm ? {} : { 'Content-Type': 'application/json' }),
             ...options.headers,
         },
-        ...options,
     };
 
     try {
@@ -113,8 +115,8 @@ const CardsAPI = {
      * @param {number} id - Card ID
      * @returns {Promise<object>}
      */
-    async getPayoffPlan(id) {
-        return apiRequest(`/api/cards/${id}/payoff-plan`);
+    async getPayoffPlan(id, asOf) {
+        return apiRequest(`/api/cards/${id}/payoff-plan${asOf ? `?as_of=${asOf}` : ''}`);
     },
 
     async savePayoffPlan(id, planData) {
@@ -500,6 +502,11 @@ const AnalyticsAPI = {
         return apiRequest(endpoint);
     },
 
+    /** What card debt costs per month, from imported statements. */
+    async getCostOfDebt() {
+        return apiRequest('/api/analytics/cost-of-debt');
+    },
+
     /**
      * Get per-card spending
      * @param {object} filters - { start_date, end_date }
@@ -642,6 +649,52 @@ const MaintenanceAPI = {
 // Google credentials API
 // ============================================================================
 
+const DebtAPI = {
+    /** Each card's latest statement adjusted for payments/purchases since. */
+    async getPositions() {
+        return apiRequest('/api/debt/positions');
+    },
+
+    async getPayments() {
+        return apiRequest('/api/payments');
+    },
+
+    /** @param {object} payment - {card_id, amount, currency, date, notes} */
+    async logPayment(payment) {
+        return apiRequest('/api/payments', { method: 'POST', body: JSON.stringify(payment) });
+    },
+
+    async deletePayment(id) {
+        return apiRequest(`/api/payments/${id}`, { method: 'DELETE' });
+    },
+};
+
+const StatementsAPI = {
+    /** @returns {Promise<Array>} Stored statements, newest first */
+    async getAll() {
+        return apiRequest('/api/statements');
+    },
+
+    /**
+     * Upload a bank statement PDF
+     * @param {File} file
+     * @returns {Promise<Array>} The statements read from it (one per card account)
+     */
+    async upload(file) {
+        const body = new FormData();
+        body.append('file', file);
+        return apiRequest('/api/statements/upload', { method: 'POST', body });
+    },
+
+    async remove(id) {
+        return apiRequest(`/api/statements/${id}`, { method: 'DELETE' });
+    },
+
+    async setPaid(id, paid) {
+        return apiRequest(`/api/statements/${id}/paid`, { method: 'POST', body: JSON.stringify({ paid }) });
+    },
+};
+
 const CredentialsAPI = {
     /** @returns {Promise<object>} { has_credentials, has_token } */
     async getStatus() {
@@ -749,6 +802,8 @@ window.API = {
     Sync: SyncAPI,
     Maintenance: MaintenanceAPI,
     Credentials: CredentialsAPI,
+    Statements: StatementsAPI,
+    Debt: DebtAPI,
     Budgets: BudgetsAPI,
     Income: IncomeAPI,
 };

@@ -208,3 +208,52 @@
         grid-template-columns: 1fr;
     }
 }
+
+
+/* What the card debt costs (from statements) */
+.debt-cost {
+    margin-bottom: var(--spacing-lg, 24px);
+    padding: var(--spacing-lg, 24px);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--danger);
+    border-radius: var(--border-radius);
+    background: var(--bg-secondary);
+}
+
+.debt-cost-empty {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-left-color: var(--border-color);
+}
+
+.debt-cost-headline {
+    margin: 0 0 4px;
+}
+
+.debt-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: var(--spacing-md, 16px);
+    margin: var(--spacing-md, 16px) 0;
+}
+
+.debt-tile-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.debt-tile-value {
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.debt-advice {
+    margin: 0 0 var(--spacing-md, 16px);
+    padding-left: 20px;
+}
+
+.debt-projection {
+    margin-top: var(--spacing-sm, 8px);
+    font-weight: 500;
+}

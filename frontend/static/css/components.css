@@ -404,3 +404,148 @@
     background: var(--primary);
     color: #fff;
 }
+
+
+/* Settings: imported bank statements */
+.statement-item {
+    margin-top: var(--spacing-md, 16px);
+    padding: var(--spacing-md, 16px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-secondary);
+}
+
+.statement-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.statement-head .icon-btn {
+    margin-left: auto;
+}
+
+.statement-badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.statement-badge.review {
+    border-color: var(--warning);
+    color: var(--warning);
+}
+
+.statement-warnings {
+    margin: 8px 0;
+    padding-left: 20px;
+    color: var(--warning);
+    font-size: 13px;
+}
+
+.statement-table {
+    width: 100%;
+    margin-top: 8px;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.statement-table th,
+.statement-table td {
+    padding: 4px 8px;
+    text-align: right;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.statement-table th:first-child,
+.statement-table td:first-child {
+    text-align: left;
+}
+
+.statement-installments {
+    margin: 4px 0 0;
+    padding-left: 20px;
+    font-size: 13px;
+}
+
+.statement-badge.bad {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.statement-row-strong td {
+    font-weight: 600;
+}
+
+.payment-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--spacing-md, 16px);
+    align-items: end;
+    margin: var(--spacing-md, 16px) 0;
+}
+
+/* Same-height fields with labels on one line, so the row lines up (the date
+   picker and the select otherwise render at different heights and fonts). */
+.payment-form .form-group {
+    margin-bottom: 0;
+}
+
+.payment-form .input {
+    height: 42px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.payment-form .btn {
+    height: 42px;
+    width: 100%;
+}
+
+/* Payments list: text columns left, amount right, delete button last */
+.payments-table th,
+.payments-table td {
+    text-align: left;
+}
+
+.payments-table th:nth-child(3),
+.payments-table td:nth-child(3) {
+    text-align: right;
+}
+
+.payments-table th:last-child,
+.payments-table td:last-child {
+    width: 48px;
+    text-align: center;
+}
+
+/* Debt page: room between the card blocks and the sections below them */
+#debt-positions {
+    margin-bottom: var(--spacing-lg, 24px);
+}
+
+.export-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: var(--spacing-md, 16px) 0;
+    cursor: pointer;
+}
+
+.export-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm, 8px);
+}
+
+/* Statement history: money columns right-aligned, the card column left */
+.statement-history-table td,
+.statement-history-table th {
+    vertical-align: top;
+}
+
+.statement-history-table td:nth-child(2),
+.statement-history-table th:nth-child(2) {
+    text-align: left;
+}
