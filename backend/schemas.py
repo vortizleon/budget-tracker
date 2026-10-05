@@ -622,6 +622,18 @@ class CardPayoffPlanUpdate(BaseModel):
     monthly_spend_usd: Optional[Decimal] = Field(default=None, ge=0)
 
 
+class StatementSnapshot(BaseModel):
+    """The card's latest bank statement, offered as the source for payoff-plan numbers."""
+    period: str
+    cut_date: Optional[date] = None
+    balance_crc: Optional[Decimal] = None
+    balance_usd: Optional[Decimal] = None
+    annual_rate_crc: Optional[Decimal] = None
+    annual_rate_usd: Optional[Decimal] = None
+    min_payment_crc: Optional[Decimal] = None
+    min_payment_usd: Optional[Decimal] = None
+
+
 class CardPayoffPlanResponse(BaseModel):
     """A card's saved plan (plan=None if none yet) plus the recent average
     monthly spend on the card, used as the default spend estimate."""
@@ -634,6 +646,7 @@ class CardPayoffPlanResponse(BaseModel):
     # (index 0 = the as-of month) - added on top of the average spend.
     scheduled_installments_crc: List[Decimal] = []
     scheduled_installments_usd: List[Decimal] = []
+    statement: Optional[StatementSnapshot] = None  # latest imported statement for this card
 
 
 # ============================================================================
@@ -731,6 +744,7 @@ class StatementResponse(BaseModel):
     closing_balance_usd: Optional[Decimal] = None
     apr_crc: Optional[Decimal] = None
     apr_usd: Optional[Decimal] = None
+    paid_on: Optional[date] = None
     status: str
     warnings: List[str] = []
     parser_version: int
@@ -780,3 +794,21 @@ class CostOfDebt(BaseModel):
     future_installments_crc: Optional[Decimal] = None  # 0% installments not yet billed
     cards: List[CostOfDebtCard] = []
     history: List[CostOfDebtMonth] = []
+
+
+class DueStatement(BaseModel):
+    """A statement whose payment is due soon (or overdue) and not marked paid."""
+    id: int
+    card_name: str
+    account_last4: str
+    period: str
+    cash_due_date: date
+    days_left: int  # negative = overdue
+    min_payment_crc: Optional[Decimal] = None
+    min_payment_usd: Optional[Decimal] = None
+    cash_payment_crc: Optional[Decimal] = None
+    cash_payment_usd: Optional[Decimal] = None
+
+
+class StatementPaid(BaseModel):
+    paid: bool = True

@@ -1,5 +1,6 @@
 """Save parsed statements to the database (upload and re-parse)."""
 import json
+from datetime import date
 from decimal import Decimal
 from typing import List
 
@@ -96,3 +97,42 @@ def reparse_all(db: Session) -> List[models.Statement]:
         rows.extend(store(db, p, raw_text) for p in parsed)
     db.commit()
     return rows
+
+
+DUE_WARNING_DAYS = 7
+
+
+def due_soon(db: Session, today: date = None) -> List[dict]:
+    """Latest statement per account whose pay-in-full date is within a week
+    (or already passed) and which hasn't been marked paid, soonest first."""
+    today = today or date.today()
+    latest = {}
+    for row in db.query(models.Statement).order_by(models.Statement.period).all():
+        latest[(row.bank, row.account_last4)] = row   # later periods overwrite earlier ones
+    due = []
+    for row in latest.values():
+        if row.paid_on is not None or row.cash_due_date is None:
+            continue
+        days_left = (row.cash_due_date - today).days
+        if days_left > DUE_WARNING_DAYS:
+            continue
+        due.append({
+            "id": row.id,
+            "card_name": row.card.name if row.card else f"••••{row.account_last4}",
+            "account_last4": row.account_last4,
+            "period": row.period,
+            "cash_due_date": row.cash_due_date,
+            "days_left": days_left,
+            "min_payment_crc": row.min_payment_crc, "min_payment_usd": row.min_payment_usd,
+            "cash_payment_crc": row.cash_payment_crc, "cash_payment_usd": row.cash_payment_usd,
+        })
+    return sorted(due, key=lambda d: d["days_left"])
+
+
+def set_paid(db: Session, statement_id: int, paid: bool):
+    row = db.get(models.Statement, statement_id)
+    if row is None:
+        return None
+    row.paid_on = date.today() if paid else None
+    db.commit()
+    return row

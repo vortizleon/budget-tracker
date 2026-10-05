@@ -49,10 +49,77 @@ let lastGmailCheck = 0;
 
 function startGmailWatch() {
     checkGmailStatus();
+    checkDueStatements();
     setInterval(checkGmailStatus, GMAIL_CHECK_MS);
+    setInterval(checkDueStatements, GMAIL_CHECK_MS);
     // Coming back to the tab after a while is when a dead token matters most.
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && Date.now() - lastGmailCheck > 5 * 60 * 1000) checkGmailStatus();
+        if (!document.hidden && Date.now() - lastGmailCheck > 5 * 60 * 1000) {
+            checkGmailStatus();
+            checkDueStatements();
+        }
+    });
+}
+
+// ----------------------------------------------------------------------------
+// Payment due dates - from imported statements. Not marked paid = keep warning.
+// ----------------------------------------------------------------------------
+
+async function checkDueStatements() {
+    try {
+        setDueBanner(await API.Statements.getDue());
+    } catch (error) {
+        console.error('Due-date check failed:', error);
+    }
+}
+
+function setDueBanner(list) {
+    let banner = document.getElementById('due-banner');
+    if (!list.length) {
+        if (banner) banner.remove();
+        return;
+    }
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'due-banner';
+        banner.className = 'gmail-banner due-banner';
+        document.querySelector('.main-content').prepend(banner);
+    }
+    const money = (crc, usd) => [
+        parseFloat(crc) > 0 ? formatCurrency(crc, 'CRC') : null,
+        parseFloat(usd) > 0 ? formatCurrency(usd, 'USD') : null,
+    ].filter(Boolean).join(' + ') || '-';
+    const overdue = list.some(d => d.days_left < 0);
+    banner.classList.toggle('overdue', overdue);
+    banner.innerHTML = '<div class="due-banner-body"></div>';
+    const body = banner.firstChild;
+    list.forEach(d => {
+        const when = d.days_left < 0
+            ? _tp(-d.days_left, 'was due {n} day ago', 'was due {n} days ago')
+            : (d.days_left === 0 ? _t('is due today') : _tp(d.days_left, 'is due in {n} day', 'is due in {n} days'));
+        const row = document.createElement('div');
+        row.className = 'due-row';
+        row.innerHTML = `<div><strong>${escapeHtml(d.card_name)}</strong> ${when} (${formatDate(d.cash_due_date)}).
+            <span class="field-hint">${_t('Minimum {min} - in full {full}. Paying only the minimum means interest on the whole balance.', {
+                min: money(d.min_payment_crc, d.min_payment_usd), full: money(d.cash_payment_crc, d.cash_payment_usd),
+            })}</span></div>`;
+        const btn = document.createElement('button');
+        btn.className = 'btn-primary';
+        btn.textContent = _t('Mark as paid');
+        btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            try {
+                await API.Statements.setPaid(d.id, true);
+                await checkDueStatements();
+                if (currentView === 'settings') renderStatements(await API.Statements.getAll());
+            } catch (error) {
+                console.error('Mark paid failed:', error);
+                showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');
+                btn.disabled = false;
+            }
+        });
+        row.appendChild(btn);
+        body.appendChild(row);
     });
 }
 
@@ -895,11 +962,37 @@ let currentPayoffCardId = null;
 let currentPayoffAvgSpend = { CRC: 0, USD: 0 };
 let currentPayoffInstallments = { CRC: [], USD: [] };
 
+let currentPayoffStatement = null;
+let currentPayoffAvgDays = 0;
+
+function payoffSpendHintHtml(currency, asOf) {
+    return _t('Recent average: {amount}/month (last {days} days, not counting Tasa Cero). Leave blank to use it.', {
+        amount: `<span class="money-value">${formatCurrency(currentPayoffAvgSpend[currency], currency)}</span>`,
+        days: currentPayoffAvgDays,
+    }) + installmentsHint(currentPayoffInstallments[currency], asOf, currency);
+}
+
 async function showPayoffPlan(cardId) {
     try {
         const card = allCards.find(c => c.id === cardId) || await API.Cards.getById(cardId);
-        const data = await API.Cards.getPayoffPlan(cardId);
+        let data = await API.Cards.getPayoffPlan(cardId);
         currentPayoffCardId = cardId;
+        currentPayoffStatement = data.statement;
+
+        // No plan yet but there is a statement: start from the bank's own numbers
+        // (balance, interest rate, minimum payment) instead of a blank form.
+        let plan = data.plan || {};
+        let hint = '';
+        if (!data.plan && data.statement) {
+            plan = planFromStatement(data.statement, {});
+            data = await API.Cards.getPayoffPlan(cardId, plan.balance_as_of);
+            hint = _t('Filled in from your {period} statement: balance, interest rate and minimum payment. Change the payment to see what paying more does.', { period: data.statement.period });
+        } else if (data.plan && data.statement && data.statement.cut_date > data.plan.balance_as_of) {
+            hint = `${_t('Your {period} statement is newer than this plan.', { period: data.statement.period })}
+                <button type="button" class="btn btn-secondary" onclick="applyStatementToPayoff()">${_t('Update balance and rates from the statement')}</button>`;
+        }
+        document.getElementById('payoff-statement-hint').innerHTML = hint ? `<p class="field-hint">${hint}</p>` : '';
+
         currentPayoffAvgSpend = {
             CRC: parseFloat(data.avg_monthly_spend_crc),
             USD: parseFloat(data.avg_monthly_spend_usd),
@@ -908,11 +1001,11 @@ async function showPayoffPlan(cardId) {
             CRC: data.scheduled_installments_crc.map(parseFloat),
             USD: data.scheduled_installments_usd.map(parseFloat),
         };
+        currentPayoffAvgDays = data.avg_based_on_days;
 
         document.getElementById('payoff-modal-title').textContent = `${card.name} - ${_t('Payoff Plan')}`;
         document.getElementById('payoff-delete-btn').style.display = data.plan ? '' : 'none';
 
-        const plan = data.plan || {};
         document.getElementById('payoff-as-of').value = plan.balance_as_of || formatDateForInput(new Date());
 
         for (const currency of ['CRC', 'USD']) {
@@ -925,12 +1018,7 @@ async function showPayoffPlan(cardId) {
             const spendInput = document.getElementById(`payoff-spend-${c}`);
             spendInput.value = num(plan[`monthly_spend_${c}`]);
             spendInput.placeholder = currentPayoffAvgSpend[currency].toFixed(2);
-            document.getElementById(`payoff-spend-hint-${c}`).innerHTML =
-                _t('Recent average: {amount}/month (last {days} days, not counting Tasa Cero). Leave blank to use it.', {
-                    amount: `<span class="money-value">${formatCurrency(currentPayoffAvgSpend[currency], currency)}</span>`,
-                    days: data.avg_based_on_days,
-                }) +
-                installmentsHint(currentPayoffInstallments[currency], plan.balance_as_of, currency);
+            document.getElementById(`payoff-spend-hint-${c}`).innerHTML = payoffSpendHintHtml(currency, plan.balance_as_of);
         }
 
         renderPayoffProjection();
@@ -940,6 +1028,53 @@ async function showPayoffPlan(cardId) {
     } catch (error) {
         console.error('Failed to load payoff plan:', error);
         showNotification(_t('Failed to load payoff plan'), 'error');
+    }
+}
+
+// A payoff-plan form state taken from a statement. `keep` supplies the payments/spend to
+// preserve; with nothing to keep, the monthly payment starts at the statement's minimum.
+function planFromStatement(st, keep) {
+    const plan = {
+        balance_as_of: st.cut_date,
+        balance_crc: st.balance_crc, balance_usd: st.balance_usd,
+        annual_rate_crc: st.annual_rate_crc, annual_rate_usd: st.annual_rate_usd,
+        monthly_payment_crc: st.min_payment_crc, monthly_payment_usd: st.min_payment_usd,
+        monthly_spend_crc: null, monthly_spend_usd: null,
+    };
+    return { ...plan, ...keep };
+}
+
+// "Update from statement" in an existing plan: take the new balance, rates and date,
+// keep the payment and spending the user chose.
+async function applyStatementToPayoff() {
+    const st = currentPayoffStatement;
+    if (!st) return;
+    const keep = {};
+    for (const c of ['crc', 'usd']) {
+        keep[`monthly_payment_${c}`] = parseFloat(document.getElementById(`payoff-payment-${c}`).value) || 0;
+        const spend = document.getElementById(`payoff-spend-${c}`).value;
+        keep[`monthly_spend_${c}`] = spend === '' ? null : parseFloat(spend);
+    }
+    const plan = planFromStatement(st, keep);
+    try {
+        const data = await API.Cards.getPayoffPlan(currentPayoffCardId, plan.balance_as_of);
+        currentPayoffInstallments = {
+            CRC: data.scheduled_installments_crc.map(parseFloat),
+            USD: data.scheduled_installments_usd.map(parseFloat),
+        };
+        document.getElementById('payoff-as-of').value = plan.balance_as_of;
+        for (const currency of ['CRC', 'USD']) {
+            const c = currency.toLowerCase();
+            document.getElementById(`payoff-balance-${c}`).value = parseFloat(plan[`balance_${c}`]) || 0;
+            document.getElementById(`payoff-rate-${c}`).value = parseFloat(plan[`annual_rate_${c}`]) || 0;
+            document.getElementById(`payoff-spend-hint-${c}`).innerHTML = payoffSpendHintHtml(currency, plan.balance_as_of);
+        }
+        document.getElementById('payoff-statement-hint').innerHTML =
+            `<p class="field-hint">${_t('Updated from your {period} statement. Save the plan to keep it.', { period: st.period })}</p>`;
+        renderPayoffProjection();
+    } catch (error) {
+        console.error('Failed to apply statement:', error);
+        showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');
     }
 }
 
@@ -2088,6 +2223,9 @@ function renderStatements(list) {
                 <span class="statement-badge ${review ? 'review' : 'ok'}">${review ? _t('Needs review') : _t('OK')}</span>
                 <button class="icon-btn" onclick="deleteStatement(${st.id})" title="${_t('Delete')}">🗑️</button>
             </div>
+            <div class="field-hint">${st.paid_on
+                ? `✓ ${_t('Paid on {date}', { date: formatDate(st.paid_on) })} <a href="#" onclick="event.preventDefault(); toggleStatementPaid(${st.id}, false)">${_t('Undo')}</a>`
+                : `<a href="#" onclick="event.preventDefault(); toggleStatementPaid(${st.id}, true)">${_t('Mark as paid')}</a>`}</div>
             <div class="field-hint">${_t('Cut {cut} · pay by {due}', { cut: formatDate(st.cut_date), due: formatDate(st.cash_due_date) })}</div>
             ${review ? `<ul class="statement-warnings">${warnings}</ul>` : ''}
             <table class="statement-table">
@@ -2134,6 +2272,17 @@ function handleStatementDrop(event) {
     event.preventDefault();
     event.currentTarget.classList.remove('dragover');
     handleStatementFiles(event.dataTransfer.files);
+}
+
+async function toggleStatementPaid(id, paid) {
+    try {
+        await API.Statements.setPaid(id, paid);
+        renderStatements(await API.Statements.getAll());
+        checkDueStatements();
+    } catch (error) {
+        console.error('Mark paid failed:', error);
+        showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');
+    }
 }
 
 async function deleteStatement(id) {
@@ -2691,6 +2840,8 @@ window.handleCredentialsFile = handleCredentialsFile;
 window.handleStatementFiles = handleStatementFiles;
 window.handleStatementDrop = handleStatementDrop;
 window.deleteStatement = deleteStatement;
+window.toggleStatementPaid = toggleStatementPaid;
+window.applyStatementToPayoff = applyStatementToPayoff;
 window.handleCredentialsDrop = handleCredentialsDrop;
 window.closeModal = closeModal;
 window.showAddCardModal = showAddCardModal;

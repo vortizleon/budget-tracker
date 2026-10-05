@@ -115,8 +115,8 @@ const CardsAPI = {
      * @param {number} id - Card ID
      * @returns {Promise<object>}
      */
-    async getPayoffPlan(id) {
-        return apiRequest(`/api/cards/${id}/payoff-plan`);
+    async getPayoffPlan(id, asOf) {
+        return apiRequest(`/api/cards/${id}/payoff-plan${asOf ? `?as_of=${asOf}` : ''}`);
     },
 
     async savePayoffPlan(id, planData) {
@@ -668,6 +668,15 @@ const StatementsAPI = {
 
     async remove(id) {
         return apiRequest(`/api/statements/${id}`, { method: 'DELETE' });
+    },
+
+    /** Statements to pay within a week (or overdue) that aren't marked paid. */
+    async getDue() {
+        return apiRequest('/api/statements/due');
+    },
+
+    async setPaid(id, paid) {
+        return apiRequest(`/api/statements/${id}/paid`, { method: 'POST', body: JSON.stringify({ paid }) });
     },
 };
 

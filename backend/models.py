@@ -365,6 +365,8 @@ class Statement(Base):
     apr_crc = Column(DECIMAL(7, 4))  # nominal annual rate, %
     apr_usd = Column(DECIMAL(7, 4))
 
+    paid_on = Column(Date)  # when the user marked this statement's payment as made
+
     status = Column(String, nullable=False, default="ok")  # "ok" | "needs_review"
     warnings_json = Column(Text)  # JSON list of strings
     parser_version = Column(Integer, nullable=False, default=1)

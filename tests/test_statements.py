@@ -103,3 +103,42 @@ def test_cost_of_debt_empty_then_from_statement(client):
     # 3 of 6 installments of $50 are still to come
     assert float(d["future_installments_crc"]) == pytest.approx(3 * 50 * rate)
     assert len(d["history"]) == 1
+
+
+def test_due_soon_and_mark_paid(client):
+    from datetime import date, timedelta
+    from backend import statements
+    from backend.database import SessionLocal
+
+    client.post("/api/cards", json={"name": "Test Amex", "last_four": "1112", "color": "#112233"})
+    [row] = client.post("/api/statements/upload", files={"file": ("s.pdf", make_pdf(statement_text()), "application/pdf")}).json()
+    due = date(2026, 10, 3)                                   # the fixture's pay-in-full date
+    db = SessionLocal()
+    try:
+        assert statements.due_soon(db, today=due - timedelta(days=10)) == []          # not yet
+        [d] = statements.due_soon(db, today=due - timedelta(days=2))
+        assert d["days_left"] == 2 and d["card_name"] == "Test Amex"
+        [late] = statements.due_soon(db, today=due + timedelta(days=3))                # overdue stays until paid
+        assert late["days_left"] == -3
+    finally:
+        db.close()
+
+    paid = client.post(f"/api/statements/{row['id']}/paid", json={"paid": True}).json()
+    assert paid["paid_on"] is not None
+    db = SessionLocal()
+    try:
+        assert statements.due_soon(db, today=due) == []
+    finally:
+        db.close()
+    assert client.post(f"/api/statements/{row['id']}/paid", json={"paid": False}).json()["paid_on"] is None
+    assert client.post("/api/statements/9999/paid", json={"paid": True}).status_code == 404
+
+
+def test_payoff_plan_offers_latest_statement_numbers(client):
+    card = client.post("/api/cards", json={"name": "Test Amex", "last_four": "1112", "color": "#112233"}).json()
+    assert client.get(f"/api/cards/{card['id']}/payoff-plan").json()["statement"] is None
+    client.post("/api/statements/upload", files={"file": ("s.pdf", make_pdf(statement_text()), "application/pdf")})
+    snap = client.get(f"/api/cards/{card['id']}/payoff-plan").json()["statement"]
+    assert snap["period"] == "2026-09" and snap["cut_date"] == "2026-09-18"
+    assert snap["balance_crc"] == "3500.00" and snap["balance_usd"] == "41.00"
+    assert snap["annual_rate_crc"] == "35.8800" and snap["min_payment_crc"] == "1000.00"

@@ -64,11 +64,26 @@ def get_scheduled_installments(db: Session, card_id: int, as_of: date) -> dict[s
     return schedule
 
 
-def get_plan(db: Session, card_id: int) -> schemas.CardPayoffPlanResponse:
+def get_plan(db: Session, card_id: int, as_of: date = None) -> schemas.CardPayoffPlanResponse:
     plan = db.query(models.CardPayoffPlan).filter(models.CardPayoffPlan.card_id == card_id).first()
     crc, usd, days = get_avg_monthly_spend(db, card_id)
-    installments = get_scheduled_installments(db, card_id, plan.balance_as_of if plan else date.today())
+    installments = get_scheduled_installments(db, card_id, as_of or (plan.balance_as_of if plan else date.today()))
+    latest = (
+        db.query(models.Statement)
+        .filter(models.Statement.card_id == card_id)
+        .order_by(models.Statement.period.desc())
+        .first()
+    )
+    snapshot = None
+    if latest:
+        snapshot = schemas.StatementSnapshot(
+            period=latest.period, cut_date=latest.cut_date,
+            balance_crc=latest.closing_balance_crc, balance_usd=latest.closing_balance_usd,
+            annual_rate_crc=latest.apr_crc, annual_rate_usd=latest.apr_usd,
+            min_payment_crc=latest.min_payment_crc, min_payment_usd=latest.min_payment_usd,
+        )
     return schemas.CardPayoffPlanResponse(
+        statement=snapshot,
         card_id=card_id,
         plan=schemas.CardPayoffPlanUpdate.model_validate(plan, from_attributes=True) if plan else None,
         avg_monthly_spend_crc=crc,

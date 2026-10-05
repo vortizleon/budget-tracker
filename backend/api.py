@@ -744,11 +744,13 @@ def get_card_billing_cycles(card_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/api/cards/{card_id}/payoff-plan", response_model=schemas.CardPayoffPlanResponse)
-def get_card_payoff_plan(card_id: int, db: Session = Depends(get_db)):
-    """A card's saved payoff plan (if any) and its recent monthly spend."""
+def get_card_payoff_plan(card_id: int, as_of: Optional[date] = None, db: Session = Depends(get_db)):
+    """A card's saved payoff plan (if any) and its recent monthly spend. `as_of`
+    computes the upcoming Tasa Cero charges from that date instead of the plan's
+    (used when the numbers are taken from a newer statement)."""
     if not crud.get_card(db, card_id):
         raise HTTPException(status_code=404, detail="Card not found")
-    return payoff.get_plan(db, card_id)
+    return payoff.get_plan(db, card_id, as_of=as_of)
 
 
 @app.put("/api/cards/{card_id}/payoff-plan", response_model=schemas.CardPayoffPlanResponse)
@@ -1012,6 +1014,21 @@ def list_statements(card_id: Optional[int] = None, db: Session = Depends(get_db)
         query = query.filter(models.Statement.card_id == card_id)
     rows = query.order_by(models.Statement.period.desc(), models.Statement.account_last4).all()
     return [_statement_response(r) for r in rows]
+
+
+@app.get("/api/statements/due", response_model=List[schemas.DueStatement])
+def get_due_statements(db: Session = Depends(get_db)):
+    """Statements to pay soon (within a week) or overdue, not yet marked paid."""
+    return statements.due_soon(db)
+
+
+@app.post("/api/statements/{statement_id}/paid", response_model=schemas.StatementResponse)
+def mark_statement_paid(statement_id: int, body: schemas.StatementPaid, db: Session = Depends(get_db)):
+    """Mark a statement's payment as made (or undo it) - this hides the due-date banner."""
+    row = statements.set_paid(db, statement_id, body.paid)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    return _statement_response(row)
 
 
 @app.post("/api/statements/reparse", response_model=List[schemas.StatementResponse])
