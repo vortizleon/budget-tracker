@@ -1,4 +1,5 @@
 """FastAPI application with REST API endpoints."""
+import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,14 +34,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware for frontend
+# CORS: the frontend is served from this same server, so it needs no CORS at
+# all. Only allow local origins so a random website open in the browser can't
+# read or change your data through localhost.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
-    allow_credentials=True,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Only one Gmail sync at a time: two at once race on the unique message id and
+# can open two login prompts.
+_sync_lock = threading.Lock()
 
 # Setup static files and templates
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -835,6 +841,15 @@ def trigger_sync(
 ):
     """Trigger Gmail sync - either a rolling N-day window (days_back) or an
     explicit start_date/end_date backfill, same as `finance-app sync`."""
+    if not _sync_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="A sync is already running - wait for it to finish")
+    try:
+        return _run_sync(sync_request, db)
+    finally:
+        _sync_lock.release()
+
+
+def _run_sync(sync_request: schemas.SyncRequest, db: Session):
     email_sources = crud.get_email_sources(db, active_only=True)
 
     if not email_sources:

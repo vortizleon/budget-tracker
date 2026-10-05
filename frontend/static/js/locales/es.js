@@ -409,6 +409,7 @@ window.I18N_ES = {
   "Log in to Gmail": "Iniciar sesión en Gmail",
   "Waiting for login...": "Esperando el inicio de sesión...",
   "A Google login is opening in your browser...": "Se está abriendo un inicio de sesión de Google en el navegador...",
+  "A sync is already running - wait for it to finish": "Ya hay una sincronización en curso: esperar a que termine",
   "Sync failed: {error}": "Falló la sincronización: {error}",
   "Pick a start and end date first": "Elegir primero una fecha de inicio y una de fin",
   "Working...": "Procesando...",
