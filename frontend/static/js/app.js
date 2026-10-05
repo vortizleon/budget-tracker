@@ -751,12 +751,13 @@ async function loadCards() {
 
 async function loadDebt() {
     try {
-        const [positions, payments, costOfDebt, cards, budgetOverview] = await Promise.all([
+        const [positions, payments, costOfDebt, cards, budgetOverview, statements] = await Promise.all([
             API.Debt.getPositions(),
             API.Debt.getPayments(),
             API.Analytics.getCostOfDebt().catch(() => null),
             API.Cards.getAll(),
             API.Budgets.getOverview().catch(() => null),
+            API.Statements.getAll().catch(() => []),
         ]);
         allCards = cards;
         renderPositions(positions);
@@ -764,6 +765,7 @@ async function loadDebt() {
         renderPaymentForm(cards);
         renderPayments(payments);
         renderCostOfDebt(costOfDebt);
+        renderStatementHistory(statements);
     } catch (error) {
         console.error('Failed to load debt:', error);
         showNotification(_t('Failed to load debt'), 'error');
@@ -846,6 +848,49 @@ function renderPayments(list) {
                 : `<span class="field-hint">${_t('from bank email')}</span>`}</td>
         </tr>`).join('')}
     </table>`;
+}
+
+// One row per imported statement: what it showed and what it cost. Warnings stay visible
+// here, since a statement flagged on import is the one whose numbers to double-check.
+function renderStatementHistory(list) {
+    const section = document.getElementById('statement-history-section');
+    section.style.display = list.length ? '' : 'none';
+    if (!list.length) return;
+    const both = (crc, usd) => {
+        const parts = [];
+        if (parseFloat(crc) > 0) parts.push(formatCurrency(crc, 'CRC'));
+        if (parseFloat(usd) > 0) parts.push(formatCurrency(usd, 'USD'));
+        return parts.length ? `<span class="money-value">${parts.join('<br>')}</span>` : '-';
+    };
+    const monthLabel = (period) => {
+        const [y, m] = period.split('-').map(Number);
+        return new Date(y, m - 1, 1).toLocaleString(I18N.locale(), { month: 'short', year: 'numeric' });
+    };
+    document.getElementById('statement-history').innerHTML = `<table class="statement-table statement-history-table">
+        <tr><th>${_t('Month')}</th><th>${_t('Card')}</th><th>${_t('Balance at cut')}</th><th>${_t('Interest charged')}</th>
+            <th>${_t('Insurance')}</th><th>${_t('Paid this cycle')}</th><th></th></tr>
+        ${list.map(st => `<tr>
+            <td>${escapeHtml(monthLabel(st.period))}</td>
+            <td>${escapeHtml(st.card_name || '••••' + st.account_last4)}
+                ${st.status !== 'ok' ? `<br><span class="statement-badge review">${_t('Needs review')}</span>` : ''}</td>
+            <td>${both(st.closing_balance_crc, st.closing_balance_usd)}</td>
+            <td>${both(st.interest_crc, st.interest_usd)}</td>
+            <td>${both(st.insurance_crc, st.insurance_usd)}</td>
+            <td>${both(st.payments_crc, st.payments_usd)}</td>
+            <td><button class="icon-btn" onclick="removeStatement(${st.id})" title="${_t('Delete')}">🗑️</button></td>
+        </tr>${st.status !== 'ok' ? `<tr><td colspan="7"><ul class="statement-warnings">${(st.warnings || []).map(w => `<li>${escapeHtml(_t(w))}</li>`).join('')}</ul></td></tr>` : ''}`).join('')}
+    </table>`;
+}
+
+async function removeStatement(id) {
+    if (!confirm(_t('Delete this statement? You can upload the PDF again from Settings.'))) return;
+    try {
+        await API.Statements.remove(id);
+        await loadDebt();
+    } catch (error) {
+        console.error('Delete statement failed:', error);
+        showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');
+    }
 }
 
 // The snapshot is a normal file download from the API (Content-Disposition: attachment).
@@ -2858,6 +2903,7 @@ window.handleCredentialsFile = handleCredentialsFile;
 window.handleStatementFiles = handleStatementFiles;
 window.submitPayment = submitPayment;
 window.downloadSnapshot = downloadSnapshot;
+window.removeStatement = removeStatement;
 window.removePayment = removePayment;
 window.handleStatementDrop = handleStatementDrop;
 window.applyStatementToPayoff = applyStatementToPayoff;

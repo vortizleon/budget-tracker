@@ -538,3 +538,14 @@
     flex-wrap: wrap;
     gap: var(--spacing-sm, 8px);
 }
+
+/* Statement history: money columns right-aligned, the card column left */
+.statement-history-table td,
+.statement-history-table th {
+    vertical-align: top;
+}
+
+.statement-history-table td:nth-child(2),
+.statement-history-table th:nth-child(2) {
+    text-align: left;
+}
