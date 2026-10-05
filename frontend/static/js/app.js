@@ -434,10 +434,9 @@ function renderBudgetSummary(o) {
     document.getElementById('budget-plan-note').innerHTML = shortfall > 0
         ? `<span class="budget-over">${_t("Card debt is {amount} more than everything that isn't locked - lower the payment or unlock a budget.", { amount: crc(shortfall) })}</span>`
         : (unbudgeted < 0 ? `<span class="budget-over">${_t('Budgets add up to {amount} more than your income.', { amount: crc(-unbudgeted) })}</span>` : '');
-
-    renderBudgetDebt(o);
 }
 
+// The month's payment plan per card (from the payoff plans). Shown on the Debt page.
 function renderBudgetDebt(o) {
     const container = document.getElementById('budget-debt-list');
     if (o.debt_lines.length === 0) {
@@ -484,7 +483,7 @@ function renderBudgetDebt(o) {
                 ${rows}
             </div>
         `;
-    }).join('') + `<p class="field-hint">${_t('Your usual purchases and cuotas are already counted in your category budgets below, so here only the part of the payment that pays down the old balance counts as debt.')}</p>`;
+    }).join('') + `<p class="field-hint">${_t('Your usual purchases and cuotas are already counted in your category budgets, so here only the part of the payment that pays down the old balance counts as debt.')}</p>`;
 }
 
 function renderIncomeEntries(o) {
@@ -752,14 +751,16 @@ async function loadCards() {
 
 async function loadDebt() {
     try {
-        const [positions, payments, costOfDebt, cards] = await Promise.all([
+        const [positions, payments, costOfDebt, cards, budgetOverview] = await Promise.all([
             API.Debt.getPositions(),
             API.Debt.getPayments(),
             API.Analytics.getCostOfDebt().catch(() => null),
             API.Cards.getAll(),
+            API.Budgets.getOverview().catch(() => null),
         ]);
         allCards = cards;
         renderPositions(positions);
+        if (budgetOverview) renderBudgetDebt(budgetOverview);
         renderPaymentForm(cards);
         renderPayments(payments);
         renderCostOfDebt(costOfDebt);
@@ -1344,6 +1345,7 @@ async function savePayoffPlan(event) {
         closeModal();
         showNotification(_t('Payoff plan saved'), 'success');
         if (currentView === 'budgets') await loadBudgets();
+        if (currentView === 'debt') await loadDebt();
     } catch (error) {
         console.error('Failed to save payoff plan:', error);
         showNotification(_t('Failed to save payoff plan: {error}', { error: _t(error.message) }), 'error');
@@ -1358,6 +1360,7 @@ async function deletePayoffPlan() {
         closeModal();
         showNotification(_t('Payoff plan deleted'), 'success');
         if (currentView === 'budgets') await loadBudgets();
+        if (currentView === 'debt') await loadDebt();
     } catch (error) {
         console.error('Failed to delete payoff plan:', error);
         showNotification(_t('Failed to delete payoff plan'), 'error');

@@ -243,7 +243,7 @@ window.I18N_ES = {
   " - all of it pays down the old balance": ": todo se destina a reducir el saldo anterior",
   "toward old debt": "para la deuda anterior",
   "Edit plan": "Editar plan",
-  "Your usual purchases and cuotas are already counted in your category budgets below, so here only the part of the payment that pays down the old balance counts as debt.": "Las compras habituales y las cuotas ya están incluidas en los presupuestos por categoría de abajo, así que aquí solo cuenta como deuda la parte del pago que reduce el saldo anterior.",
+  "Your usual purchases and cuotas are already counted in your category budgets, so here only the part of the payment that pays down the old balance counts as debt.": "Las compras habituales y las cuotas ya están incluidas en los presupuestos por categoría, así que aquí solo cuenta como deuda la parte del pago que reduce el saldo anterior.",
   "No payments logged this month yet - click \"+ Add Payment\" when you get paid.": "Aún no hay pagos registrados este mes: hacer clic en \"+ Agregar pago\" al recibir uno.",
 
   // --- Budgets: lines, income, settings
