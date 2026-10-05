@@ -1560,7 +1560,7 @@ async function loadAnalytics(filters = {}) {
             API.Analytics.getSpendingByCategory({ currency: 'USD', start_date, end_date }),
             API.Analytics.getTopMerchants({ currency: 'CRC', start_date, end_date, limit: 10 }),
             API.Analytics.getTopMerchants({ currency: 'USD', start_date, end_date, limit: 10 }),
-            API.Analytics.getCardUtilization({ start_date, end_date }),
+            API.Analytics.getSpendingByCard({ start_date, end_date }),
         ]);
 
         renderDailySpendingChart(dailyCrc, dailyUsd);
@@ -1569,7 +1569,7 @@ async function loadAnalytics(filters = {}) {
         renderCategoryPieChart(categoryUsd, '#chart-category-pie-usd', 'USD');
         renderTopMerchantsChart(merchantsCrc, '#chart-top-merchants-crc', 'CRC');
         renderTopMerchantsChart(merchantsUsd, '#chart-top-merchants-usd', 'USD');
-        renderCardUtilizationChart(cardData);
+        renderSpendingByCardChart(cardData);
     } catch (error) {
         console.error('Failed to load analytics:', error);
         showNotification(_t('Failed to load analytics'), 'error');
@@ -1740,8 +1740,8 @@ function renderTopMerchantsChart(data, containerId, currency) {
     });
 }
 
-function renderCardUtilizationChart(data) {
-    renderChart("#chart-card-utilization", {
+function renderSpendingByCardChart(data) {
+    renderChart("#chart-spending-by-card", {
         series: [
             { name: _t('Spent (CRC)'), data: data.map(d => parseFloat(d.spent_crc)) },
             { name: _t('Spent (USD)'), data: data.map(d => parseFloat(d.spent_usd)) }
@@ -1810,8 +1810,8 @@ function renderCategories(categories) {
     container.innerHTML = categories.map(cat => `
         <div class="category-item">
             <div class="category-info">
-                <div class="category-color-dot" style="background-color: ${cat.color}"></div>
-                <div class="category-icon">${cat.icon}</div>
+                <div class="category-color-dot" style="background-color: ${safeColor(cat.color)}"></div>
+                <div class="category-icon">${escapeHtml(cat.icon)}</div>
                 <div class="category-name">${escapeHtml(_tc(cat.name))}</div>
             </div>
             <div class="category-actions">

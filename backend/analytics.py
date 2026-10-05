@@ -270,13 +270,13 @@ def get_top_merchants(
     ]
 
 
-def get_card_utilization(
+def get_spending_by_card(
     db: Session,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-) -> List[schemas.CardUtilization]:
+) -> List[schemas.SpendingByCard]:
     """
-    Get per-card spending (and utilization against the card's limit).
+    Get per-card purchase totals, per currency.
 
     Args:
         db: Database session
@@ -284,7 +284,7 @@ def get_card_utilization(
         end_date: Only count purchases on/before this date (optional)
 
     Returns:
-        List of CardUtilization objects
+        List of SpendingByCard objects, one per active card
     """
     cards = db.query(models.Card).filter(models.Card.is_active == True).all()
 
@@ -294,53 +294,26 @@ def get_card_utilization(
     if end_date:
         date_filters.append(models.Transaction.date <= end_date)
 
-    utilization_data = []
-
-    for card in cards:
-        # Get spending in CRC
-        spent_crc = db.query(func.sum(models.Transaction.amount)).filter(
+    def total(card_id: int, currency: str) -> Decimal:
+        return db.query(func.sum(models.Transaction.amount)).filter(
             and_(
-                models.Transaction.card_id == card.id,
-                models.Transaction.currency == 'CRC',
+                models.Transaction.card_id == card_id,
+                models.Transaction.currency == currency,
                 models.Transaction.transaction_type == 'purchase',
                 *date_filters
             )
         ).scalar() or Decimal(0)
 
-        # Get spending in USD
-        spent_usd = db.query(func.sum(models.Transaction.amount)).filter(
-            and_(
-                models.Transaction.card_id == card.id,
-                models.Transaction.currency == 'USD',
-                models.Transaction.transaction_type == 'purchase',
-                *date_filters
-            )
-        ).scalar() or Decimal(0)
-
-        # Calculate utilization percentages
-        utilization_crc = None
-        if card.credit_limit_crc and card.credit_limit_crc > 0:
-            utilization_crc = float((spent_crc / card.credit_limit_crc) * 100)
-
-        utilization_usd = None
-        if card.credit_limit_usd and card.credit_limit_usd > 0:
-            utilization_usd = float((spent_usd / card.credit_limit_usd) * 100)
-
-        utilization_data.append(
-            schemas.CardUtilization(
-                card_id=card.id,
-                card_name=card.name,
-                card_color=card.color,
-                spent_crc=spent_crc,
-                limit_crc=card.credit_limit_crc,
-                utilization_crc=round(utilization_crc, 2) if utilization_crc else None,
-                spent_usd=spent_usd,
-                limit_usd=card.credit_limit_usd,
-                utilization_usd=round(utilization_usd, 2) if utilization_usd else None
-            )
+    return [
+        schemas.SpendingByCard(
+            card_id=card.id,
+            card_name=card.name,
+            card_color=card.color,
+            spent_crc=total(card.id, 'CRC'),
+            spent_usd=total(card.id, 'USD'),
         )
-
-    return utilization_data
+        for card in cards
+    ]
 
 
 def get_dashboard_summary(db: Session) -> schemas.DashboardSummary:
