@@ -13,12 +13,14 @@ const API_BASE_URL = '';  // Empty for same-origin requests
 async function apiRequest(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
 
+    // A FormData body (file upload) needs the browser to set its own multipart Content-Type.
+    const isForm = options.body instanceof FormData;
     const config = {
+        ...options,
         headers: {
-            'Content-Type': 'application/json',
+            ...(isForm ? {} : { 'Content-Type': 'application/json' }),
             ...options.headers,
         },
-        ...options,
     };
 
     try {
@@ -642,6 +644,28 @@ const MaintenanceAPI = {
 // Google credentials API
 // ============================================================================
 
+const StatementsAPI = {
+    /** @returns {Promise<Array>} Stored statements, newest first */
+    async getAll() {
+        return apiRequest('/api/statements');
+    },
+
+    /**
+     * Upload a bank statement PDF
+     * @param {File} file
+     * @returns {Promise<Array>} The statements read from it (one per card account)
+     */
+    async upload(file) {
+        const body = new FormData();
+        body.append('file', file);
+        return apiRequest('/api/statements/upload', { method: 'POST', body });
+    },
+
+    async remove(id) {
+        return apiRequest(`/api/statements/${id}`, { method: 'DELETE' });
+    },
+};
+
 const CredentialsAPI = {
     /** @returns {Promise<object>} { has_credentials, has_token } */
     async getStatus() {
@@ -749,6 +773,7 @@ window.API = {
     Sync: SyncAPI,
     Maintenance: MaintenanceAPI,
     Credentials: CredentialsAPI,
+    Statements: StatementsAPI,
     Budgets: BudgetsAPI,
     Income: IncomeAPI,
 };

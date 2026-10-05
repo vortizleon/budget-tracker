@@ -674,3 +674,66 @@ class MonthForecast(BaseModel):
     projected_spend: Decimal
     projected_left: Decimal  # income_base - projected_spend - total_debt
     lines: List[ForecastLine]
+
+
+# ============================================================================
+# Statements (bank estado de cuenta)
+# ============================================================================
+
+class StatementFinancingLineResponse(BaseModel):
+    merchant: Optional[str] = None
+    currency: Optional[str] = None
+    total_amount: Optional[Decimal] = None
+    term_months: Optional[int] = None
+    annual_rate: Optional[Decimal] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    installment_amount: Optional[Decimal] = None
+    installment_number: Optional[int] = None
+    installments_total: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StatementResponse(BaseModel):
+    id: int
+    card_id: Optional[int] = None
+    card_name: Optional[str] = None
+    bank: str
+    brand: Optional[str] = None
+    loyalty_plan: Optional[str] = None
+    account_last4: str
+    period: str
+    cut_date: Optional[date] = None
+    min_due_date: Optional[date] = None
+    cash_due_date: Optional[date] = None
+    limit_currency: Optional[str] = None
+    credit_limit: Optional[Decimal] = None
+    available: Optional[Decimal] = None
+    points_assigned: Optional[Decimal] = None
+    previous_balance_crc: Optional[Decimal] = None
+    previous_balance_usd: Optional[Decimal] = None
+    purchases_crc: Optional[Decimal] = None
+    purchases_usd: Optional[Decimal] = None
+    payments_crc: Optional[Decimal] = None
+    payments_usd: Optional[Decimal] = None
+    interest_crc: Optional[Decimal] = None
+    interest_usd: Optional[Decimal] = None
+    insurance_crc: Optional[Decimal] = None
+    insurance_usd: Optional[Decimal] = None
+    other_charges_crc: Optional[Decimal] = None
+    other_charges_usd: Optional[Decimal] = None
+    min_payment_crc: Optional[Decimal] = None
+    min_payment_usd: Optional[Decimal] = None
+    cash_payment_crc: Optional[Decimal] = None
+    cash_payment_usd: Optional[Decimal] = None
+    closing_balance_crc: Optional[Decimal] = None
+    closing_balance_usd: Optional[Decimal] = None
+    apr_crc: Optional[Decimal] = None
+    apr_usd: Optional[Decimal] = None
+    status: str
+    warnings: List[str] = []
+    parser_version: int
+    financing_lines: List[StatementFinancingLineResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)

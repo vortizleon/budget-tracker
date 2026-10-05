@@ -402,6 +402,22 @@
                 </div>
 
                 <div class="settings-section">
+                    <h3>Bank statements</h3>
+                    <p class="field-hint">Upload the monthly statement PDF (estado de cuenta) from your bank. It is the bank's own record, so it shows what the emails can't: interest, insurance charges, the amount to pay in full, the due date and your real interest rate. If the bank changes the layout, a statement that doesn't add up is flagged for review instead of being trusted.</p>
+                    <label id="statement-dropzone" class="dropzone"
+                           ondragover="event.preventDefault(); this.classList.add('dragover')"
+                           ondragleave="this.classList.remove('dragover')"
+                           ondrop="handleStatementDrop(event)">
+                        <input type="file" id="statement-file" accept=".pdf,application/pdf" multiple
+                               onchange="handleStatementFiles(this.files)" hidden>
+                        <strong>Drop a statement PDF here</strong>
+                        <span>or click to choose one (you can pick several)</span>
+                    </label>
+                    <p class="field-hint">Stays on this computer.</p>
+                    <div id="statements-list"></div>
+                </div>
+
+                <div class="settings-section">
                     <h3>Email Sources</h3>
                     <p class="field-hint">The bank addresses the app reads transaction alerts from - not your own email. BAC and Promerica are pre-loaded; add more here if you bank elsewhere.</p>
                     <div id="email-sources-list">
