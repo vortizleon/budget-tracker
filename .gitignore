@@ -43,7 +43,7 @@ token.pickle
 CLAUDE.md
 
 # Runtime
-.server.log
+.server.log*
 backups/
 
 # IDE
