@@ -940,7 +940,7 @@ function renderCostOfDebt(d) {
         advice.push(_t('{amount} a month is optional insurance and services billed to the card - cancel what you did not choose on purpose.', { amount: money(d.insurance_crc) }));
     }
     if (d.statements_needing_review > 0) {
-        advice.push(_t('{n} statement(s) need review in Settings - these numbers may be incomplete.', { n: d.statements_needing_review }));
+        advice.push(_t('{n} statement(s) were flagged when imported - these numbers may be incomplete. Upload the PDF again after fixing the card, or send it to be checked.', { n: d.statements_needing_review }));
     }
 
     // The statement's cost is history; this follows what you owe today, so paying down moves it.
@@ -2144,17 +2144,15 @@ function renderCategories(categories) {
 
 async function loadSettings() {
     try {
-        const [emailSources, syncStatus, credStatus, statements] = await Promise.all([
+        const [emailSources, syncStatus, credStatus] = await Promise.all([
             API.EmailSources.getAll(),
             API.Sync.getStatus().catch(() => ({ last_sync: null })),
             API.Credentials.getStatus().catch(() => null),
-            API.Statements.getAll().catch(() => []),
         ]);
 
         renderEmailSources(emailSources);
         renderSyncStatus(syncStatus);
         renderCredentialsStatus(credStatus);
-        renderStatements(statements);
     } catch (error) {
         console.error('Failed to load settings:', error);
         showNotification(_t('Failed to load settings'), 'error');
@@ -2282,59 +2280,6 @@ function renderCredentialsStatus(status) {
 // Bank statements (estado de cuenta PDFs)
 // ============================================================================
 
-function renderStatements(list) {
-    const container = document.getElementById('statements-list');
-    if (!list.length) {
-        container.innerHTML = '';
-        return;
-    }
-    const money = (v, cur) => `<span class="money-value">${formatCurrency(v, cur)}</span>`;
-    const monthLabel = (period) => {
-        const [y, m] = period.split('-').map(Number);
-        return new Date(y, m - 1, 1).toLocaleString(I18N.locale(), { month: 'long', year: 'numeric' });
-    };
-    // One small table: a row per figure, a column per currency.
-    const figure = (label, crc, usd, hint) => {
-        if (crc == null && usd == null) return '';
-        return `<tr><td>${label}${hint ? ` <span class="field-hint">${hint}</span>` : ''}</td>
-            <td>${crc == null ? '' : money(crc, 'CRC')}</td><td>${usd == null ? '' : money(usd, 'USD')}</td></tr>`;
-    };
-    container.innerHTML = list.map(st => {
-        const title = st.card_name ? escapeHtml(st.card_name) : `••••${escapeHtml(st.account_last4)}`;
-        const review = st.status !== 'ok';
-        const warnings = (st.warnings || []).map(w => `<li>${escapeHtml(_t(w))}</li>`).join('');
-        const rate = (v) => (v == null ? null : `${parseFloat(v)}%`);
-        const installments = (st.financing_lines || []).map(f => `<li>${escapeHtml(f.merchant || '')}:
-            ${money(f.installment_amount, f.currency)} - ${_t('payment {n} of {total}', { n: f.installment_number, total: f.installments_total })}
-            (${_t('ends {date}', { date: formatDate(f.end_date) })})</li>`).join('');
-        return `
-        <div class="statement-item">
-            <div class="statement-head">
-                <strong>${title}</strong> · ${escapeHtml(monthLabel(st.period))}
-                <span class="statement-badge ${review ? 'review' : 'ok'}">${review ? _t('Needs review') : _t('OK')}</span>
-                <button class="icon-btn" onclick="deleteStatement(${st.id})" title="${_t('Delete')}">🗑️</button>
-            </div>
-            <div class="field-hint">${st.paid_on
-                ? `✓ ${_t('Paid on {date}', { date: formatDate(st.paid_on) })} <a href="#" onclick="event.preventDefault(); toggleStatementPaid(${st.id}, false)">${_t('Undo')}</a>`
-                : `<a href="#" onclick="event.preventDefault(); toggleStatementPaid(${st.id}, true)">${_t('Mark as paid')}</a>`}</div>
-            <div class="field-hint">${_t('Cut {cut} · pay by {due}', { cut: formatDate(st.cut_date), due: formatDate(st.cash_due_date) })}</div>
-            ${review ? `<ul class="statement-warnings">${warnings}</ul>` : ''}
-            <table class="statement-table">
-                <tr><th></th><th>CRC</th><th>USD</th></tr>
-                ${figure(_t('Balance at cut'), st.closing_balance_crc, st.closing_balance_usd)}
-                ${figure(_t('Pay in full (no interest)'), st.cash_payment_crc, st.cash_payment_usd)}
-                ${figure(_t('Minimum payment'), st.min_payment_crc, st.min_payment_usd)}
-                ${figure(_t('Interest charged'), st.interest_crc, st.interest_usd)}
-                ${figure(_t('Insurance and optional charges'), st.insurance_crc, st.insurance_usd)}
-                ${figure(_t('Other charges (IVA, etc.)'), st.other_charges_crc, st.other_charges_usd)}
-                ${figure(_t('Paid this cycle'), st.payments_crc, st.payments_usd)}
-                <tr><td>${_t('Interest rate (per year)')}</td><td>${rate(st.apr_crc) || ''}</td><td>${rate(st.apr_usd) || ''}</td></tr>
-            </table>
-            ${installments ? `<div class="field-hint">${_t('Installments on this statement')}</div><ul class="statement-installments">${installments}</ul>` : ''}
-        </div>`;
-    }).join('');
-}
-
 async function handleStatementFiles(files) {
     const input = document.getElementById('statement-file');
     try {
@@ -2348,12 +2293,15 @@ async function handleStatementFiles(files) {
                         : _t('Read {n} statement(s) from {file}', { n: rows.length, file: file.name }),
                     flagged ? 'info' : 'success'
                 );
+                // Statements are no longer listed in Settings, so say what's wrong right here.
+                rows.filter(r => r.status !== 'ok').forEach(r => {
+                    (r.warnings || []).slice(0, 3).forEach(w => showNotification(`${r.card_name || r.account_last4}: ${_t(w)}`, 'error'));
+                });
             } catch (error) {
                 console.error('Statement upload failed:', error);
                 showNotification(_t('{file}: {error}', { file: file.name, error: _t(error.message) }), 'error');
             }
         }
-        renderStatements(await API.Statements.getAll());
     } finally {
         if (input) input.value = '';
     }
@@ -2363,26 +2311,6 @@ function handleStatementDrop(event) {
     event.preventDefault();
     event.currentTarget.classList.remove('dragover');
     handleStatementFiles(event.dataTransfer.files);
-}
-
-async function toggleStatementPaid(id, paid) {
-    try {
-        await API.Statements.setPaid(id, paid);
-        renderStatements(await API.Statements.getAll());
-    } catch (error) {
-        console.error('Mark paid failed:', error);
-        showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');
-    }
-}
-
-async function deleteStatement(id) {
-    try {
-        await API.Statements.remove(id);
-        renderStatements(await API.Statements.getAll());
-    } catch (error) {
-        console.error('Delete statement failed:', error);
-        showNotification(_t('Failed: {error}', { error: _t(error.message) }), 'error');
-    }
 }
 
 async function handleCredentialsFile(file) {
@@ -2932,8 +2860,6 @@ window.submitPayment = submitPayment;
 window.downloadSnapshot = downloadSnapshot;
 window.removePayment = removePayment;
 window.handleStatementDrop = handleStatementDrop;
-window.deleteStatement = deleteStatement;
-window.toggleStatementPaid = toggleStatementPaid;
 window.applyStatementToPayoff = applyStatementToPayoff;
 window.handleCredentialsDrop = handleCredentialsDrop;
 window.closeModal = closeModal;

@@ -459,7 +459,7 @@ window.I18N_ES = {
   "not in the balance yet, but already committed": "todavía no están en el saldo, pero ya están comprometidas",
   "{hi} debt costs {hiRate} a year against {loRate} on {lo} - put extra money toward the {hi} balance first.": "La deuda en {hi} cuesta {hiRate} al año contra {loRate} en {lo}: destinar el dinero extra primero al saldo en {hi}.",
   "{amount} a month is optional insurance and services billed to the card - cancel what you did not choose on purpose.": "{amount} al mes son seguros y servicios opcionales cobrados a la tarjeta: cancelar lo que no se eligió a propósito.",
-  "{n} statement(s) need review in Settings - these numbers may be incomplete.": "{n} estado(s) de cuenta requieren revisión en Configuración: estas cifras pueden estar incompletas.",
+  "{n} statement(s) were flagged when imported - these numbers may be incomplete. Upload the PDF again after fixing the card, or send it to be checked.": "{n} estado(s) de cuenta quedaron marcados al importarse: estas cifras pueden estar incompletas. Subir el PDF de nuevo después de corregir la tarjeta, o enviarlo para que lo revisen.",
   "Your card debt costs {amount} a month": "La deuda de las tarjetas cuesta {amount} al mes",
   "Interest {interest} + insurance {insurance}, from your {period} statements. Dollars converted at ₡{rate}.": "Intereses {interest} + seguros {insurance}, según los estados de cuenta de {period}. Dólares convertidos a ₡{rate}.",
   "Owed (in colones)": "Deuda (en colones)",
