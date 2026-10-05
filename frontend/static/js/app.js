@@ -271,7 +271,9 @@ async function showView(viewName, { push = true } = {}) {
             await loadTransactions();
             break;
         case 'analytics':
-            await loadAnalytics(currentAnalyticsFilters);
+            // Default to the current month the first time; afterwards keep whatever range was picked.
+            if (analyticsRangeInitialized) await loadAnalytics(currentAnalyticsFilters);
+            else await setAnalyticsPreset('month');
             break;
         case 'forecast':
             await loadMonthForecast();
@@ -1332,6 +1334,7 @@ function clearFilters() {
 // ============================================================================
 
 let currentAnalyticsFilters = {};
+let analyticsRangeInitialized = false;
 let cachedOldestTransactionDate = null;
 
 // ApexCharts ships only English UI strings in the main bundle (toolbar menu, tooltips),
@@ -1581,12 +1584,11 @@ function applyAnalyticsFilters() {
 }
 
 function clearAnalyticsFilters() {
-    document.getElementById('analytics-start-date').value = '';
-    document.getElementById('analytics-end-date').value = '';
-    loadAnalytics({});
+    setAnalyticsPreset('month');   // back to the default range
 }
 
 async function setAnalyticsPreset(preset) {
+    analyticsRangeInitialized = true;
     const fmt = formatDateForInput;
     const today = new Date();
     let start;
@@ -1617,7 +1619,7 @@ async function setAnalyticsPreset(preset) {
 
     document.getElementById('analytics-start-date').value = start;
     document.getElementById('analytics-end-date').value = end;
-    loadAnalytics({ start_date: start, end_date: end });
+    await loadAnalytics({ start_date: start, end_date: end });
 }
 
 function renderCategoryPieChart(data, containerId, currency) {
