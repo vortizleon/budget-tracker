@@ -4,15 +4,16 @@ Statements are the bank's own record, so interest, insurance and rates come
 from them rather than being estimated. USD amounts are converted to CRC with
 the budget settings' exchange rate so totals can be compared and added.
 """
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date, timedelta
+from functools import lru_cache
 from decimal import Decimal
 from typing import Dict, List, Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from . import budgets, models, schemas
+from . import budgets, models, schemas, statement_parser
 
 HISTORY_MONTHS = 12
 ZERO = Decimal(0)
@@ -26,16 +27,70 @@ def _crc(crc, usd, rate: Decimal) -> Decimal:
     return _d(crc) + _d(usd) * rate
 
 
+REWARDS_PREFIX = "Redención de puntos"   # points redeemed for a statement credit
+INSURANCE_PREFIX = "SEGURO"                # billed on the cut day, listed on the statement in colones
+
+
 def _sum_since(db: Session, card_id: int, kind: str, currency: str, after: date, today: date) -> Decimal:
-    """Total of a card's purchases/payments dated after the statement cut (up to today)."""
-    total = db.query(func.sum(models.Transaction.amount)).filter(
+    """Total of a card's purchases/payments dated after the statement cut (up to today).
+    Points redemptions are credits the bank applies on a later statement - they are not
+    counted as payments, so "pay in full" matches the bank's figure."""
+    query = db.query(func.sum(models.Transaction.amount)).filter(
         models.Transaction.card_id == card_id,
         models.Transaction.transaction_type == kind,
         models.Transaction.currency == currency,
         models.Transaction.date > after,
         models.Transaction.date <= today,
+    )
+    if kind == "payment":
+        query = query.filter(~models.Transaction.commerce_name.like(f"{REWARDS_PREFIX}%"))
+    return _d(query.scalar())
+
+
+def _rewards_since(db: Session, card_id: int, currency: str, after: date, today: date) -> Decimal:
+    total = db.query(func.sum(models.Transaction.amount)).filter(
+        models.Transaction.card_id == card_id,
+        models.Transaction.transaction_type == "payment",
+        models.Transaction.currency == currency,
+        models.Transaction.date > after,
+        models.Transaction.date <= today,
+        models.Transaction.commerce_name.like(f"{REWARDS_PREFIX}%"),
     ).scalar()
     return _d(total)
+
+
+@lru_cache(maxsize=16)
+def _statement_purchase_lines(raw_text: str) -> Dict[str, Counter]:
+    """{account last 4: Counter of (currency, amount)} for every purchase on the statement PDF."""
+    try:
+        parsed = statement_parser.parse_text(raw_text)
+    except statement_parser.StatementError:
+        return {}
+    return {p.account_last4: Counter(p.purchase_lines) for p in parsed}
+
+
+def _cut_day_purchases_after_statement(db: Session, st: models.Statement) -> Dict[str, Decimal]:
+    """Purchases dated ON the cut day that the statement doesn't list: bought after the
+    bank's cut-off, so they belong to the next statement and count as owed now.
+    Matched against the statement's own purchase lines by currency and amount."""
+    totals = {"CRC": ZERO, "USD": ZERO}
+    if st.card_id is None or st.cut_date is None or not st.raw_text:
+        return totals
+    listed = Counter(_statement_purchase_lines(st.raw_text).get(st.account_last4, Counter()))
+    rows = db.query(models.Transaction).filter(
+        models.Transaction.card_id == st.card_id,
+        models.Transaction.transaction_type == "purchase",
+        models.Transaction.date == st.cut_date,
+    ).order_by(models.Transaction.id).all()
+    for t in rows:
+        if (t.commerce_name or "").upper().startswith(INSURANCE_PREFIX):
+            continue
+        key = (t.currency, _d(t.amount))
+        if listed[key] > 0:
+            listed[key] -= 1          # this one is on the statement
+        elif t.currency in totals:
+            totals[t.currency] += _d(t.amount)
+    return totals
 
 
 def latest_statements(db: Session) -> List[models.Statement]:
@@ -53,10 +108,13 @@ def position_for(db: Session, st: models.Statement, today: date) -> schemas.Card
     cut = st.cut_date or today
     pay = {"CRC": ZERO, "USD": ZERO}
     buy = {"CRC": ZERO, "USD": ZERO}
+    rewards = {"CRC": ZERO, "USD": ZERO}
     if st.card_id is not None:
+        late = _cut_day_purchases_after_statement(db, st)
         for cur in pay:
             pay[cur] = _sum_since(db, st.card_id, "payment", cur, cut, today)
-            buy[cur] = _sum_since(db, st.card_id, "purchase", cur, cut, today)
+            buy[cur] = _sum_since(db, st.card_id, "purchase", cur, cut, today) + late[cur]
+            rewards[cur] = _rewards_since(db, st.card_id, cur, cut, today)
 
     def f(prefix, cur):
         return _d(getattr(st, f"{prefix}_{cur.lower()}"))
@@ -67,6 +125,7 @@ def position_for(db: Session, st: models.Statement, today: date) -> schemas.Card
         vals[f"statement_balance_{c}"] = f("closing_balance", cur)
         vals[f"payments_since_{c}"] = pay[cur]
         vals[f"purchases_since_{c}"] = buy[cur]
+        vals[f"rewards_since_{c}"] = rewards[cur]
         vals[f"balance_now_{c}"] = f("closing_balance", cur) - pay[cur] + buy[cur]
         vals[f"min_payment_{c}"] = f("min_payment", cur)
         vals[f"cash_payment_{c}"] = f("cash_payment", cur)

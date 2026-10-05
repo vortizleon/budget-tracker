@@ -498,6 +498,7 @@ window.I18N_ES = {
   "At what you owe now, it would be about {amount} a month going forward{change}.": "Con lo que se debe ahora, serían unos {amount} al mes de aquí en adelante{change}.",
   "{amount} less than the statement": "{amount} menos que en el estado de cuenta",
   "{amount} more than the statement": "{amount} más que en el estado de cuenta",
+  "Points redeemed (credited on the next statement)": "Puntos canjeados (se acreditan en el próximo estado de cuenta)",
   "Sync failed: {error}": "Falló la sincronización: {error}",
   "Pick a start and end date first": "Elegir primero una fecha de inicio y una de fin",
   "Working...": "Procesando...",

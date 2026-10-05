@@ -74,6 +74,9 @@ class ParsedStatement:
     amounts: Dict[str, Dict[str, Optional[Decimal]]] = field(
         default_factory=lambda: {"CRC": {}, "USD": {}})
     financing_lines: List[FinancingLine] = field(default_factory=list)
+    # (currency, amount) of every purchase line on the statement (credits are negative) -
+    # used to tell which transactions dated on the cut day the statement already includes.
+    purchase_lines: List[Tuple[str, Decimal]] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
     @property
@@ -230,6 +233,7 @@ def _parse_bac_section(sec: str, account_last4: str) -> ParsedStatement:
         sums = {"CRC": Decimal(0), "USD": Decimal(0)}
         for m in re.finditer(r"(?m)^\d{9,}\s+" + DATE + r"\s+.*?\s+(CRC|USD)\s+" + AMT + r"\s*$", region):
             sums[m.group(2)] += _num(m.group(3))
+            st.purchase_lines.append((m.group(2), _num(m.group(3))))
         for cur in ("CRC", "USD"):
             printed = st.amounts[cur].get("purchases_total")
             if printed is not None and abs(sums[cur] - printed) > TOLERANCE:

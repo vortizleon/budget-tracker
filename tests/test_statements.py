@@ -214,3 +214,36 @@ def test_bank_email_payment_is_not_double_counted(client):
         assert not debt.manual_payment_exists(db, card["id"], "USD", Decimal("1000"), date(2026, 9, 25))
     finally:
         db.close()
+
+
+def _tx(client, card_id, **kw):
+    body = {"card_id": card_id, "currency": "CRC", "transaction_type": "purchase"}
+    body.update(kw)
+    r = client.post("/api/transactions", json=body)
+    assert r.status_code == 201, r.text
+
+
+def test_points_redemption_is_not_a_payment(client):
+    card = _upload_with_card(client)
+    _tx(client, card["id"], date="2026-09-26", amount="500", transaction_type="payment",
+        commerce_name="Redención de puntos (TEST PLAN)")
+    client.post("/api/payments", json={"card_id": card["id"], "amount": "1000", "currency": "CRC", "date": "2026-09-29"})
+    pos = client.get("/api/debt/positions").json()[0]
+    assert float(pos["payments_since_crc"]) == 1000           # only the real payment
+    assert float(pos["rewards_since_crc"]) == 500             # shown separately
+    assert float(pos["remaining_cash_crc"]) == 2300           # 3,300 pay-in-full - 1,000 (the bank's figure)
+
+
+def test_cut_day_purchases_only_count_when_the_statement_lacks_them(client):
+    card = _upload_with_card(client)
+    cut = "2026-09-18"
+    _tx(client, card["id"], date=cut, amount="1000", commerce_name="SUPERMERCADO UNO")   # on the statement
+    _tx(client, card["id"], date=cut, amount="777", commerce_name="LATE NIGHT SHOP")     # not on it: next statement
+    _tx(client, card["id"], date=cut, amount="40", currency="USD", commerce_name="STREAMING SERVICE")  # on it
+    _tx(client, card["id"], date=cut, amount="93.05", currency="USD", commerce_name="UBER EATS")      # not on it
+    _tx(client, card["id"], date=cut, amount="7.25", currency="USD", commerce_name="SEGURO FRAUDE")   # insurance: skipped
+    _tx(client, card["id"], date="2026-09-20", amount="100", commerce_name="AFTER CUT")
+    pos = client.get("/api/debt/positions").json()[0]
+    assert float(pos["purchases_since_crc"]) == 777 + 100
+    assert float(pos["purchases_since_usd"]) == pytest.approx(93.05)
+    assert float(pos["balance_now_crc"]) == 3500 + 877

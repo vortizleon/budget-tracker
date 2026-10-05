@@ -810,6 +810,7 @@ function renderPositions(list) {
                 ${row(_t('Statement balance'), p.statement_balance_crc, p.statement_balance_usd)}
                 ${row(_t('Paid since'), p.payments_since_crc, p.payments_since_usd)}
                 ${row(_t('New purchases since'), p.purchases_since_crc, p.purchases_since_usd)}
+                ${row(_t('Points redeemed (credited on the next statement)'), p.rewards_since_crc, p.rewards_since_usd)}
                 ${row(_t('Owed now (estimate)'), p.balance_now_crc, p.balance_now_usd, true)}
                 ${togo}
             </table>

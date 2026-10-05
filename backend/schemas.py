@@ -860,6 +860,8 @@ class CardPosition(BaseModel):
     payments_since_usd: Decimal
     purchases_since_crc: Decimal
     purchases_since_usd: Decimal
+    rewards_since_crc: Decimal  # points redeemed since - a credit the bank applies later, not a payment
+    rewards_since_usd: Decimal
     balance_now_crc: Decimal   # estimated: statement - payments + purchases since
     balance_now_usd: Decimal
     min_payment_crc: Decimal
