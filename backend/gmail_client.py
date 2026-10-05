@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google.auth.exceptions import RefreshError, TransportError
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -20,6 +21,33 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 CREDENTIALS_NAME = "credentials.json"
+
+
+def check_token_status(base_dir: Path = BASE_DIR) -> str:
+    """Report whether Gmail will work without a login, never opening one.
+
+    Returns "ok", "needs_login" (no token, or Google rejected the refresh) or
+    "unknown" (couldn't reach Google - don't alarm the user over that).
+    """
+    token_path = base_dir / "token.json"
+    if not token_path.exists():
+        return "needs_login"
+    try:
+        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+    except Exception:
+        return "needs_login"
+    if creds.valid:
+        return "ok"
+    if not (creds.expired and creds.refresh_token):
+        return "needs_login"
+    try:
+        creds.refresh(Request())
+    except RefreshError:
+        return "needs_login"
+    except TransportError:
+        return "unknown"
+    token_path.write_text(creds.to_json())
+    return "ok"
 
 
 def parse_client_json(text: str) -> dict:
@@ -77,6 +105,14 @@ def adopt_credentials(base_dir: Path = BASE_DIR) -> Optional[Path]:
     return target
 
 
+LOGIN_TIMEOUT_SECONDS = 300
+LOGIN_INCOMPLETE_MSG = "Gmail login was not completed - click Sync Now to try again"
+
+
+class GmailAuthRequired(Exception):
+    """Gmail needs the user to log in again and that did not finish."""
+
+
 class GmailClient:
     """Client for interacting with Gmail API."""
 
@@ -112,8 +148,18 @@ class GmailClient:
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 print("Refreshing expired token...")
-                creds.refresh(Request())
+                try:
+                    creds.refresh(Request())
+                except RefreshError as e:
+                    # Revoked or expired for good (e.g. Google test-mode tokens
+                    # last 7 days): drop it and fall back to a fresh login.
+                    print(f"Token refresh failed ({e}); starting a fresh login.")
+                    self.token_path.unlink(missing_ok=True)
+                    creds = None
             else:
+                creds = None
+
+            if creds is None:
                 if not self.credentials_path.exists():
                     raise FileNotFoundError(
                         "No Google OAuth client file found. Upload it in Settings > Google credentials "
@@ -124,7 +170,13 @@ class GmailClient:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     str(self.credentials_path), SCOPES
                 )
-                creds = flow.run_local_server(port=0)
+                try:
+                    # timeout_seconds so an abandoned login can't wait forever.
+                    creds = flow.run_local_server(port=0, timeout_seconds=LOGIN_TIMEOUT_SECONDS)
+                except Exception as e:
+                    raise GmailAuthRequired(LOGIN_INCOMPLETE_MSG) from e
+                if creds is None:
+                    raise GmailAuthRequired(LOGIN_INCOMPLETE_MSG)
 
             # Save token for future use
             with open(self.token_path, 'w') as token:

@@ -270,17 +270,29 @@ def get_top_merchants(
     ]
 
 
-def get_card_utilization(db: Session) -> List[schemas.CardUtilization]:
+def get_card_utilization(
+    db: Session,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> List[schemas.CardUtilization]:
     """
-    Get credit card utilization statistics.
+    Get per-card spending (and utilization against the card's limit).
 
     Args:
         db: Database session
+        start_date: Only count purchases on/after this date (optional)
+        end_date: Only count purchases on/before this date (optional)
 
     Returns:
         List of CardUtilization objects
     """
     cards = db.query(models.Card).filter(models.Card.is_active == True).all()
+
+    date_filters = []
+    if start_date:
+        date_filters.append(models.Transaction.date >= start_date)
+    if end_date:
+        date_filters.append(models.Transaction.date <= end_date)
 
     utilization_data = []
 
@@ -290,7 +302,8 @@ def get_card_utilization(db: Session) -> List[schemas.CardUtilization]:
             and_(
                 models.Transaction.card_id == card.id,
                 models.Transaction.currency == 'CRC',
-                models.Transaction.transaction_type == 'purchase'
+                models.Transaction.transaction_type == 'purchase',
+                *date_filters
             )
         ).scalar() or Decimal(0)
 
@@ -299,7 +312,8 @@ def get_card_utilization(db: Session) -> List[schemas.CardUtilization]:
             and_(
                 models.Transaction.card_id == card.id,
                 models.Transaction.currency == 'USD',
-                models.Transaction.transaction_type == 'purchase'
+                models.Transaction.transaction_type == 'purchase',
+                *date_filters
             )
         ).scalar() or Decimal(0)
 

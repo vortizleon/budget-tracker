@@ -573,9 +573,13 @@ async def get_top_merchants(
 
 
 @app.get("/api/analytics/card-utilization", response_model=List[schemas.CardUtilization])
-async def get_card_utilization(db: Session = Depends(get_db)):
-    """Get credit card utilization statistics."""
-    return analytics.get_card_utilization(db)
+async def get_card_utilization(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db)
+):
+    """Get per-card spending, optionally limited to a date range."""
+    return analytics.get_card_utilization(db, start_date=start_date, end_date=end_date)
 
 
 @app.get("/api/analytics/month-forecast", response_model=schemas.MonthForecast)
@@ -819,8 +823,10 @@ async def delete_subscription(subscription_id: int, db: Session = Depends(get_db
 # Sync Endpoint
 # ============================================================================
 
+# Plain def (not async): it blocks on Gmail and possibly a browser login, so it
+# must run in the threadpool instead of freezing the event loop.
 @app.post("/api/sync/trigger", response_model=schemas.SyncResponse)
-async def trigger_sync(
+def trigger_sync(
     sync_request: schemas.SyncRequest,
     db: Session = Depends(get_db)
 ):
@@ -861,6 +867,8 @@ async def trigger_sync(
             sources_synced=len(email_sources),
         )
 
+    except gmail_client.GmailAuthRequired as e:
+        raise HTTPException(status_code=401, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -951,6 +959,16 @@ async def upload_credentials(upload: CredentialsUpload):
         token.unlink()
         token_removed = True
     return {"saved": True, "replaced": previous is not None, "token_removed": token_removed}
+
+
+@app.get("/api/gmail/status")
+def get_gmail_status():
+    """Is the stored Gmail token still good? Lets the UI warn before a sync fails.
+    Plain def: a refresh check makes a network call."""
+    base = gmail_client.BASE_DIR
+    if not (base / gmail_client.CREDENTIALS_NAME).exists():
+        return {"status": "no_credentials"}
+    return {"status": gmail_client.check_token_status(base)}
 
 
 @app.post("/api/maintenance/reconnect-gmail")
