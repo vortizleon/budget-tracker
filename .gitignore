@@ -39,9 +39,6 @@ token.json
 token.json.*
 token.pickle
 
-# Local-only project notes, not for the repo
-CLAUDE.md
-
 # Runtime
 .server.log*
 backups/

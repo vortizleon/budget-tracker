@@ -1,0 +1,49 @@
+# ADVISORY CI - copy to .github/workflows/ci.yml and adapt.
+# Informs, never gates: do NOT mark these jobs as required in branch protection.
+# Fast on purpose (about a minute): a fresh install + tests on one OS.
+# Check the action versions below are still the latest before using them.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**', '.claude/**']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**', '.claude/**']
+
+# A newer commit on the same branch makes the older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Clean install + tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+
+      - name: Fresh venv (same Python the installer uses)
+        run: uv venv --python 3.13 venv
+
+      - name: Install exactly what a user gets, plus test tools
+        run: uv pip install --python venv/bin/python -r requirements.txt -r requirements-dev.txt
+
+      # Should import every module, serve every page, hit key APIs (catches missing deps and upgrade breaks).
+      - name: Tests
+        run: venv/bin/python -m pytest tests -q
+
+      - name: Real server starts and answers
+        run: |
+          venv/bin/python -m uvicorn backend.api:app --port 8000 &
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:8000/health && break; sleep 1; done
+          curl -fs -o /dev/null http://127.0.0.1:8000/
+
+      - name: Shell scripts have valid syntax
+        run: |
+          for f in *.command; do bash -n "$f" && echo "ok $f"; done

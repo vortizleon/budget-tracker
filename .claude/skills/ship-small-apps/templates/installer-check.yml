@@ -1,0 +1,37 @@
+# Slow, platform-specific check: run the real installer on a clean macOS runner.
+# Only when installer-related files change, plus on demand - not on every PR.
+# Advisory like the main CI. The runner already has Xcode tools and Homebrew, so it cannot prove
+# "works on a fresh Mac"; it does catch scripting bugs (exit codes, paths, missing steps).
+# Copy to .github/workflows/installer-check.yml and adapt the file names.
+name: Installer check (clean Mac)
+
+on:
+  push:
+    branches: [main]
+    paths: ['Instalar.command', 'Actualizar.command', 'Abrir.command', 'requirements*.txt', '.github/workflows/installer-check.yml']
+  pull_request:
+    paths: ['Instalar.command', 'Actualizar.command', 'Abrir.command', 'requirements*.txt', '.github/workflows/installer-check.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: installer-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  installer-macos:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # stdin closed on purpose: proves the script doesn't need a keyboard and exits 0.
+      - name: Run the installer
+        run: bash ./Instalar.command </dev/null
+
+      - name: Installed app imports and the dashboard is up
+        run: |
+          venv/bin/python -c "import backend.api; print('imports ok')"
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:8000/health && break; sleep 1; done
