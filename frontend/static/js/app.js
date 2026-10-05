@@ -899,6 +899,20 @@ function downloadSnapshot(format) {
     window.location.href = `/api/export/snapshot?format=${format}&include_transactions=${withTransactions}`;
 }
 
+// Copy the snapshot as text, ready to paste into a conversation (no file involved).
+async function copySnapshot() {
+    const withTransactions = document.getElementById('export-transactions').checked;
+    try {
+        const response = await fetch(`/api/export/snapshot?format=md&include_transactions=${withTransactions}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        await navigator.clipboard.writeText(await response.text());
+        showNotification(_t('Copied - paste it into the conversation'), 'success');
+    } catch (error) {
+        console.error('Copy snapshot failed:', error);
+        showNotification(_t('Could not copy - use Download instead'), 'error');
+    }
+}
+
 async function submitPayment(event) {
     event.preventDefault();
     const btn = document.getElementById('payment-submit');
@@ -2903,6 +2917,7 @@ window.handleCredentialsFile = handleCredentialsFile;
 window.handleStatementFiles = handleStatementFiles;
 window.submitPayment = submitPayment;
 window.downloadSnapshot = downloadSnapshot;
+window.copySnapshot = copySnapshot;
 window.removeStatement = removeStatement;
 window.removePayment = removePayment;
 window.handleStatementDrop = handleStatementDrop;

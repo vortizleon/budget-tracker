@@ -273,7 +273,7 @@ def test_snapshot_export_has_the_numbers_and_no_identifiers(client):
     assert any(t["merchant"] == "SECRET SHOP" for t in with_tx["transactions_last_90_days"])
 
     r = client.get("/api/export/snapshot")
-    assert "attachment" in r.headers["content-disposition"] and r.headers["content-disposition"].endswith('.md"')
+    assert "attachment" in r.headers["content-disposition"] and r.headers["content-disposition"].endswith('.txt"')
     assert client.get("/api/export/snapshot?format=pdf").status_code == 400
 
 

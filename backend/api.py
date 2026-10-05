@@ -627,8 +627,13 @@ def export_snapshot(format: str = "md", include_transactions: bool = False, db: 
     if format not in ("md", "json"):
         raise HTTPException(status_code=400, detail="format must be md or json")
     snapshot = export.build_snapshot(db, include_transactions=include_transactions)
-    body, media = (export.to_markdown(snapshot), "text/markdown") if format == "md" else (export.to_json(snapshot), "application/json")
-    filename = f"budget-snapshot-{snapshot['generated_on']}.{format}"
+    # The markdown is saved as .txt: macOS refuses to auto-open a downloaded .md file
+    # ("Apple could not verify ... is free of malware"), while .txt opens normally.
+    if format == "md":
+        body, media, extension = export.to_markdown(snapshot), "text/plain", "txt"
+    else:
+        body, media, extension = export.to_json(snapshot), "application/json", "json"
+    filename = f"budget-snapshot-{snapshot['generated_on']}.{extension}"
     return Response(content=body, media_type=f"{media}; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
