@@ -404,3 +404,67 @@
     background: var(--primary);
     color: #fff;
 }
+
+
+/* Settings: imported bank statements */
+.statement-item {
+    margin-top: var(--spacing-md, 16px);
+    padding: var(--spacing-md, 16px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-secondary);
+}
+
+.statement-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.statement-head .icon-btn {
+    margin-left: auto;
+}
+
+.statement-badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.statement-badge.review {
+    border-color: var(--warning);
+    color: var(--warning);
+}
+
+.statement-warnings {
+    margin: 8px 0;
+    padding-left: 20px;
+    color: var(--warning);
+    font-size: 13px;
+}
+
+.statement-table {
+    width: 100%;
+    margin-top: 8px;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.statement-table th,
+.statement-table td {
+    padding: 4px 8px;
+    text-align: right;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.statement-table th:first-child,
+.statement-table td:first-child {
+    text-align: left;
+}
+
+.statement-installments {
+    margin: 4px 0 0;
+    padding-left: 20px;
+    font-size: 13px;
+}

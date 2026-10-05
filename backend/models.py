@@ -316,3 +316,83 @@ class CardPayoffPlan(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     card = relationship("Card")
+
+
+class Statement(Base):
+    """One card account's monthly bank statement (estado de cuenta), parsed
+    from the PDF. The statement is the bank's own record, so it is the source
+    of truth for balances, interest and fees - the Transactions (from emails)
+    are checked against it. raw_text is kept so a parser fix can re-parse
+    without re-uploading the PDF."""
+    __tablename__ = "statements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    card_id = Column(Integer, ForeignKey("cards.id"), nullable=True)  # NULL = no card matched yet
+    bank = Column(String, nullable=False)
+    brand = Column(String)
+    loyalty_plan = Column(String)
+    account_last4 = Column(String(4), nullable=False)
+    card_last4s = Column(String)  # comma-separated card numbers seen in the movements
+    period = Column(String, nullable=False)  # "2026-09"
+    cut_date = Column(Date)
+    min_due_date = Column(Date)
+    cash_due_date = Column(Date)
+
+    limit_currency = Column(String)
+    credit_limit = Column(DECIMAL(12, 2))
+    available = Column(DECIMAL(12, 2))
+    points_assigned = Column(DECIMAL(12, 2))
+
+    # Per-currency amounts (CRC / USD pairs). payments are stored positive.
+    previous_balance_crc = Column(DECIMAL(14, 2))
+    previous_balance_usd = Column(DECIMAL(14, 2))
+    purchases_crc = Column(DECIMAL(14, 2))
+    purchases_usd = Column(DECIMAL(14, 2))
+    payments_crc = Column(DECIMAL(14, 2))
+    payments_usd = Column(DECIMAL(14, 2))
+    interest_crc = Column(DECIMAL(14, 2))   # interest charged this cycle
+    interest_usd = Column(DECIMAL(14, 2))
+    insurance_crc = Column(DECIMAL(14, 2))  # voluntary products/services (seguros)
+    insurance_usd = Column(DECIMAL(14, 2))
+    other_charges_crc = Column(DECIMAL(14, 2))  # IVA and other charges
+    other_charges_usd = Column(DECIMAL(14, 2))
+    min_payment_crc = Column(DECIMAL(14, 2))
+    min_payment_usd = Column(DECIMAL(14, 2))
+    cash_payment_crc = Column(DECIMAL(14, 2))  # "pago de contado": pay this to owe no interest
+    cash_payment_usd = Column(DECIMAL(14, 2))
+    closing_balance_crc = Column(DECIMAL(14, 2))
+    closing_balance_usd = Column(DECIMAL(14, 2))
+    apr_crc = Column(DECIMAL(7, 4))  # nominal annual rate, %
+    apr_usd = Column(DECIMAL(7, 4))
+
+    status = Column(String, nullable=False, default="ok")  # "ok" | "needs_review"
+    warnings_json = Column(Text)  # JSON list of strings
+    parser_version = Column(Integer, nullable=False, default=1)
+    raw_text = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    card = relationship("Card")
+    financing_lines = relationship(
+        "StatementFinancingLine", back_populates="statement", cascade="all, delete-orphan"
+    )
+
+
+class StatementFinancingLine(Base):
+    """An installment ("tasa cero" / otra línea de financiamiento) listed on a statement."""
+    __tablename__ = "statement_financing_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    statement_id = Column(Integer, ForeignKey("statements.id"), nullable=False)
+    merchant = Column(String)
+    currency = Column(String)
+    total_amount = Column(DECIMAL(14, 2))
+    term_months = Column(Integer)
+    annual_rate = Column(DECIMAL(7, 4))
+    start_date = Column(Date)
+    end_date = Column(Date)
+    installment_amount = Column(DECIMAL(14, 2))
+    installment_number = Column(Integer)
+    installments_total = Column(Integer)
+
+    statement = relationship("Statement", back_populates="financing_lines")

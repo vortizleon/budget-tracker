@@ -20,6 +20,7 @@ pydantic==2.13.5
 # Date/time handling
 python-dateutil==2.9.0.post0
 
-# Email parsing
+# Email + statement parsing
+pypdf==6.19.0
 beautifulsoup4==4.15.0
 lxml==6.1.3
