@@ -1,4 +1,5 @@
 """FastAPI application with REST API endpoints."""
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -17,11 +18,19 @@ from . import models, schemas, crud, analytics, budgets, payoff, forecast, gmail
 from .database import get_db, init_db
 from .sync import TransactionSyncer
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize database on startup."""
+    init_db()
+    yield
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Budgeting App API",
     description="Personal budgeting and expense tracking application",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS middleware for frontend
@@ -43,12 +52,6 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "frontend" / "templates"))
 # Root & Frontend Routes
 # ============================================================================
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database on startup."""
-    init_db()
-
-
 # Each sidebar view has its own URL (/budgets, /analytics, ...) so reloading
 # or sharing a link keeps you on that view - they all serve the same page and
 # app.js picks the view from the path. Keep in sync with VIEWS in app.js.
@@ -58,7 +61,7 @@ SPA_VIEWS = ["budgets", "transactions", "analytics", "forecast", "categories", "
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     """Serve the main SPA page."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 
 for _view in SPA_VIEWS:
